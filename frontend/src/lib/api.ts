@@ -37,7 +37,18 @@ export function getExpiresAt(): number | null {
 
 export function getStoredUser(): AuthUser | null {
   const raw = localStorage.getItem(USER_KEY)
-  return raw ? (JSON.parse(raw) as AuthUser) : null
+
+  if (raw === null) return null
+
+  try {
+    const parsed = JSON.parse(raw) as AuthUser
+
+    return typeof parsed?.id === 'number' ? parsed : null
+  } catch {
+    // Corrupted storage must never take the whole app down.
+    localStorage.removeItem(USER_KEY)
+    return null
+  }
 }
 
 export function storeSession(result: AuthResult): void {
