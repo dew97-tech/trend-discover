@@ -1,0 +1,101 @@
+# Runbook — Daily Operation & Troubleshooting
+
+> Everything needed to run and debug Trend Discover on the dev machine.
+
+---
+
+## 1. Starting the stack (3 terminals)
+
+```bash
+# Terminal 1 — API + scheduler
+cd "G:\Office Work Kandari\trend-discover-project\backend"
+php artisan serve                # :8000
+php artisan schedule:work        # cron runner for dev
+
+# Terminal 2 — queue workers (pipeline)
+php artisan queue:work --sleep=0 # add -v for verbose
+
+# Terminal 3 — frontend
+cd ../frontend
+npm run dev                      # :5173 (proxies /api → :8000)
+```
+
+Login at `http://localhost:5173` — sessions last 60 minutes.
+
+## 2. Manual pipeline commands
+
+```bash
+php artisan trends:collect          # collect from ALL enabled sources
+php artisan trends:collect hn       # one source: hn|github|rss|devto|lobsters
+php artisan trends:detect           # cluster ungrouped items + queue scoring
+php artisan trends:score            # re-score all active trends
+php artisan trends:score --trend=95 # score a single trend
+```
+
+Normal flow needs none of these — collection auto-chains detection which auto-chains
+scoring. Use them for testing/tuning.
+
+## 3. Database access
+
+```bash
+"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" \
+  -u trend_app -p trend_discover
+```
+
+Root password is in your password manager / `.env` history; app credentials live ONLY in
+`backend/.env`. Key tables: `source_items` → `trend_source_item` → `trends` → `trend_signals`.
+
+## 4. Resetting the derived data (items are kept)
+
+```sql
+SET FOREIGN_KEY_CHECKS=0;
+TRUNCATE trend_signals; TRUNCATE trend_source_item;
+TRUNCATE trend_technology; TRUNCATE trends;
+SET FOREIGN_KEY_CHECKS=1;
+```
+Then `php artisan trends:detect` to rebuild clusters with current logic.
+(Used repeatedly during Phase 3 tuning.)
+
+## 5. Debugbar
+
+- Visible on any Blade-rendered page; API requests store data server-side and return a
+  `phpdebugbar-id` header.
+- Enabled only when `APP_ENV=local && APP_DEBUG=true`.
+- Collectors on: queries(+EXPLAIN), cache, timeline, memory, jobs, HTTP client, route,
+  models, phpinfo/env.
+
+## 6. Known pitfalls & their fixes (learned the hard way)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| cURL error 60 SSL | Windows PHP has no CA bundle | `curl.cainfo`/`openssl.cafile` = `C:/tools/cacert.pem` in `C:\php\php.ini` (already set) |
+| Job silently never runs after `queue:clear` | ShouldBeUnique lock persists | `DELETE FROM cache_locks;` |
+| 401 from GitHub in worker but OK in tinker | stale long-running processes hold old config | kill stray `php.exe artisan serve`/workers (`tasklist`, `taskkill //PID x //F`) |
+| Eloquent says table `source_item_trend` missing | default pivot naming vs our migration | pivot names are explicit in all `belongsToMany` calls |
+| Titles like `[Dev.to/php] …` block cross-source merge | collector prefixes pollute shingles | stripped inside `TitleSimilarity::tokenize` |
+
+## 7. Adding a new source (checklist)
+
+1. Create `app/Domain/Trending/Collectors/MyCollector.php` implementing
+   `CollectorInterface` → return `Collection<RawItem>`
+2. Add case to `App\Enums\SourceType` (+ value string)
+3. Add match arm in `CollectorFactory`
+4. Add config entry in `SourceSeeder` + insert row into `sources` (or re-seed)
+5. Optional: schedule line in `routes/console.php`
+6. Test: `php artisan trends:collect <type>` then `queue:work --stop-when-empty`,
+   verify rows in `source_items`, second run must insert 0
+
+## 8. Tuning knobs
+
+| Knob | Where | Effect |
+|---|---|---|
+| Scoring weights | `system_settings` key `scoring.weights.default` | composite formula (hot) |
+| Cluster threshold | `TrendClusterer` ctor default 0.55 | title-merge aggressiveness |
+| Saturation sibling threshold | `SaturationAnalyzer` 0.45 | what counts as duplicate coverage |
+| Source filters (min points/stars/score, windows) | `sources.config` JSON | per-source quality bar |
+| Junk flag thresholds | `TrendClusterer::qualityFlags()` | star-farm detection sensitivity |
+
+## 9. Git conventions
+
+- Commit per phase: `Phase N: <summary>` · main branch · no secrets ever committed
+  (`.env` gitignored by Laravel default).
