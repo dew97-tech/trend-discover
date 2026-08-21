@@ -63,7 +63,10 @@ class PostGenerationService
             'research_confidence' => $research['confidence'] ?? 'medium',
         ]);
 
-        $response = $this->manager->provider()->generatePost($prompt);
+        $response = $this->manager->provider()->complete(
+            $this->prompts->render('post.system'),
+            $prompt,
+        );
 
         $data = $response->data;
 

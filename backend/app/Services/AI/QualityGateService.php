@@ -135,7 +135,10 @@ class QualityGateService
         ]);
 
         try {
-            $response = $this->manager->provider()->judgeQuality($prompt);
+            $response = $this->manager->provider()->complete(
+                $this->prompts->get('quality.system'),
+                $prompt,
+            );
 
             $this->logGeneration(
                 provider: class_basename($this->manager->provider()),

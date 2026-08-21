@@ -47,7 +47,10 @@ class ResearchService
             'signals' => $signals,
         ]);
 
-        $response = $this->manager->provider()->research($trend, $prompt);
+        $response = $this->manager->provider()->complete(
+            $this->prompts->get('research.system'),
+            $prompt,
+        );
 
         $generation = $this->logGeneration(
             provider: class_basename($this->manager->provider()),

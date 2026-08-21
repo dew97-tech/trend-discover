@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { fetchPost, patchPost, regeneratePost, type ContentPost } from '../trends/api'
+import { VisualPanel } from './VisualPanel'
 import { cn } from '@/lib/utils'
 
 const DIMENSION_LABELS: Array<[string, string]> = [
@@ -234,6 +235,8 @@ export function PostEditorPage() {
               ) : null}
             </CardContent>
           </Card>
+
+          <VisualPanel post={post} />
 
           {!post ? <Skeleton className="h-20 rounded-lg" /> : null}
         </div>

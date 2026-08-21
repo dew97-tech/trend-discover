@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ImageType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,6 +16,7 @@ class ContentImage extends Model
     protected function casts(): array
     {
         return [
+            'type' => ImageType::class,
             'spec' => 'array',
             'generated_at' => 'datetime',
         ];

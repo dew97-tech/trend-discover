@@ -128,4 +128,46 @@ JSON with exactly these keys:
 }
 TXT,
     ],
+
+    'snippet' => [
+        'system' => 'You select illustrative code for social-media cards. Return ONLY valid JSON.',
+        'user' => <<<'TXT'
+From the post below, derive ONE short code snippet (max 18 lines) that would look
+striking on a shareable code card. Prefer the before/after core, the key config,
+or the crucial function — whatever is most visually self-explanatory.
+
+POST
+{{post_body}}
+
+JSON with exactly these keys:
+{
+  "code": "the snippet source, plain text",
+  "language": "php|javascript|typescript|python|sql|bash|go|rust|other",
+  "title": "2-5 word window title shown on the card"
+}
+TXT,
+    ],
+
+    'image_prompt' => [
+        'system' => 'You write prompts for AI image generators (Midjourney/DALL-E style). Return ONLY valid JSON.',
+        'user' => <<<'TXT'
+Write an image-generation prompt for the LinkedIn post below. The image must look
+like a professional editorial illustration for software engineers: minimal, technical,
+clean geometry, no text inside the image, no stock-photo humans at desks.
+
+Style direction: flat vector / isometric technical diagram, deep blue (#0a66c2) and
+dark slate palette with one warm accent.
+
+POST SUMMARY
+{{post_summary}}
+KEY POINTS
+{{key_points}}
+
+JSON with exactly these keys:
+{
+  "prompt_text": "the full generation prompt, one paragraph",
+  "negative_prompt": "short list of things to avoid"
+}
+TXT,
+    ],
 ];

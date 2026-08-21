@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ContentImageController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\JobRunController;
 use App\Http\Controllers\Api\PostController;
@@ -42,4 +43,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/posts/{id}', [PostController::class, 'show']);
     Route::patch('/posts/{id}', [PostController::class, 'update']);
     Route::post('/posts/{id}/regenerate', [PostController::class, 'regenerate']);
+
+    // Visual assets for posts
+    Route::get('/posts/{post}/images', [ContentImageController::class, 'index']);
+    Route::post('/posts/{post}/images/snippet', [ContentImageController::class, 'suggestSnippet']);
+    Route::post('/posts/{post}/images/prompt', [ContentImageController::class, 'generatePrompt']);
+    Route::post('/posts/{post}/images/upload', [ContentImageController::class, 'upload']);
+    Route::delete('/images/{id}', [ContentImageController::class, 'destroy']);
 });

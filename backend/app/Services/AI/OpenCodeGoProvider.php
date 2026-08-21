@@ -12,24 +12,7 @@ use Illuminate\Support\Facades\Log;
  */
 final class OpenCodeGoProvider implements AIProvider
 {
-    public function __construct(private readonly PromptRegistry $prompts) {}
-
-    public function research(Trend $trend, string $renderedPrompt): AiResponse
-    {
-        return $this->chat($renderedPrompt, 'research');
-    }
-
-    public function generatePost(string $renderedPrompt): AiResponse
-    {
-        return $this->chat($renderedPrompt, 'post');
-    }
-
-    public function judgeQuality(string $renderedPrompt): AiResponse
-    {
-        return $this->chat($renderedPrompt, 'quality');
-    }
-
-    private function chat(string $userPrompt, string $task): AiResponse
+    public function complete(string $systemPrompt, string $userPrompt): AiResponse
     {
         $config = config('ai.providers.opencode_go');
         $model = (string) $config['model'];
@@ -50,7 +33,7 @@ final class OpenCodeGoProvider implements AIProvider
             ->post('/chat/completions', [
                 'model' => $model,
                 'messages' => [
-                    ['role' => 'system', 'content' => $this->systemFor($task)],
+                    ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 'temperature' => 0.7,
@@ -61,10 +44,10 @@ final class OpenCodeGoProvider implements AIProvider
         $durationMs = max(0, now()->getTimestampMs() - $started);
 
         if ($response->failed()) {
-            Log::warning('OpenCode Go request failed', ['status' => $response->status(), 'task' => $task]);
+            Log::warning('OpenCode Go request failed', ['status' => $response->status()]);
 
             throw new ConnectionException(
-                "OpenCode Go {$task} failed: {$response->status()} ".str($response->body())->limit(160),
+                "OpenCode Go request failed: {$response->status()} ".str($response->body())->limit(160),
             );
         }
 
@@ -76,7 +59,7 @@ final class OpenCodeGoProvider implements AIProvider
         );
 
         if (! is_array($content)) {
-            throw new \RuntimeException("OpenCode Go returned non-JSON content for {$task}.");
+            throw new \RuntimeException('OpenCode Go returned non-JSON content.');
         }
 
         return new AiResponse(
@@ -86,14 +69,5 @@ final class OpenCodeGoProvider implements AIProvider
             tokensOut: $payload['usage']['completion_tokens'] ?? null,
             model: $model,
         );
-    }
-
-    private function systemFor(string $task): string
-    {
-        return $this->prompts->render(match ($task) {
-            'research' => 'research.system',
-            'quality' => 'quality.system',
-            default => 'post.system', // includes shared persona via {{persona}}
-        });
     }
 }
