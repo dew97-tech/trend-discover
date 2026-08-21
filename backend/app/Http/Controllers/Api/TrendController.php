@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\TrendFilterRequest;
 use App\Http\Resources\TrendResource;
 use App\Jobs\CalculateTrendScoreJob;
+use App\Jobs\GeneratePostJob;
 use App\Models\Category;
 use App\Models\Technology;
 use App\Repositories\Contracts\TrendRepositoryInterface;
@@ -72,6 +73,26 @@ class TrendController extends Controller
         CalculateTrendScoreJob::dispatch($id);
 
         return response()->json(['message' => "Re-score queued for trend #{$id}."], 202);
+    }
+
+    public function generate(\App\Http\Requests\GeneratePostRequest $request, int $id): JsonResponse
+    {
+        $trend = $this->trends->findWithRelations($id);
+
+        abort_unless($trend !== null, 404);
+
+        $spec = new \App\Services\AI\PostSpec(
+            format: $request->string('format')->toString(),
+            tone: $request->input('tone', 'technical'),
+            angle: $request->input('angle'),
+        );
+
+        GeneratePostJob::dispatch($id, $spec, force: (bool) $request->boolean('force'));
+
+        return response()->json([
+            'message' => 'Post generation queued.',
+            'status_url' => "/api/posts?filter[trend_id]={$id}",
+        ], 202);
     }
 
     public function taxonomy(CacheRepository $cache): JsonResponse

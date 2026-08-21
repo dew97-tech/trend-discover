@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\JobRunController;
+use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\SourceController;
 use App\Http\Controllers\Api\TrendController;
 use Illuminate\Http\JsonResponse;
@@ -35,4 +36,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/trends', [TrendController::class, 'index']);
     Route::get('/trends/{id}', [TrendController::class, 'show']);
     Route::post('/trends/{id}/rescore', [TrendController::class, 'rescore']);
+    Route::post('/trends/{id}/generate', [TrendController::class, 'generate']);
+
+    Route::get('/posts', [PostController::class, 'index']);
+    Route::get('/posts/{id}', [PostController::class, 'show']);
+    Route::patch('/posts/{id}', [PostController::class, 'update']);
+    Route::post('/posts/{id}/regenerate', [PostController::class, 'regenerate']);
 });

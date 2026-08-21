@@ -7,6 +7,8 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { TrendExplorerPage } from '@/features/trends/TrendExplorerPage'
+import { PostStudioPage } from '@/features/studio/PostStudioPage'
+import { PostEditorPage } from '@/features/studio/PostEditorPage'
 
 export default function App() {
   return (
@@ -19,6 +21,8 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/trends" element={<TrendExplorerPage />} />
+              <Route path="/studio" element={<PostStudioPage />} />
+              <Route path="/studio/:id" element={<PostEditorPage />} />
               <Route
                 path="*"
                 element={

@@ -58,3 +58,60 @@ export interface Taxonomy {
 export function fetchTaxonomy(): Promise<Taxonomy> {
   return api<Taxonomy>('/taxonomy')
 }
+
+// ── Post generation ────────────────────────────────────────────────
+
+export interface GenerateSpec {
+  format: string
+  tone?: string
+  angle?: string
+}
+
+export function generatePost(trendId: number, spec: GenerateSpec): Promise<{ message: string }> {
+  return api(`/trends/${trendId}/generate`, { method: 'POST', body: spec })
+}
+
+export interface ContentPost {
+  id: number
+  trend?: { id: number; title: string } | null
+  title: string | null
+  hook: string | null
+  body: string
+  format: string
+  tone: string
+  status: string
+  quality_score: number | null
+  quality_breakdown: {
+    dimensions?: Record<string, number>
+    issues?: string[]
+  } | null
+  word_count: number | null
+  version_count?: number
+  generated_at: string | null
+}
+
+export function fetchPosts(filters: { trend_id?: string } = {}): Promise<PaginatedPosts> {
+  const params = new URLSearchParams()
+  if (filters.trend_id) params.set('filter[trend_id]', filters.trend_id)
+
+  return api<PaginatedPosts>(`/posts?${params.toString()}`)
+}
+
+export interface PaginatedPosts {
+  data: ContentPost[]
+}
+
+export function fetchPost(id: number): Promise<{ data: ContentPost }> {
+  return api(`/posts/${id}`)
+}
+
+export function patchPost(
+  id: number,
+  changes: { title?: string; hook?: string; body: string },
+): Promise<{ data: ContentPost }> {
+  return api(`/posts/${id}`, { method: 'PATCH', body: changes })
+}
+
+export function regeneratePost(id: number): Promise<{ message: string }> {
+  return api(`/posts/${id}/regenerate`, { method: 'POST' })
+}

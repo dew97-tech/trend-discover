@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Radar, RefreshCw, X } from 'lucide-react'
+import { Search, Radar, RefreshCw, X, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { fetchTrends, fetchTaxonomy, fetchTrend, rescoreTrend, type Taxonomy, type TrendDetail } from './api'
+import { FormatPickerDialog } from './FormatPickerDialog'
 import { scoreTier, type Trend } from './types'
 import { cn } from '@/lib/utils'
 
@@ -55,6 +56,7 @@ export function TrendExplorerPage() {
 
   const [selected, setSelected] = useState<TrendDetail | null>(null)
   const [rescoring, setRescoring] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 350)
@@ -341,7 +343,8 @@ export function TrendExplorerPage() {
                   <RefreshCw className={cn('size-3.5', rescoring && 'animate-spin')} />
                   Re-score
                 </Button>
-                <Button size="sm" disabled title="Arrives in Phase 5">
+                <Button size="sm" onClick={() => setPickerOpen(true)}>
+                  <Sparkles className="size-3.5" />
                   Generate Post
                 </Button>
               </div>
@@ -354,6 +357,12 @@ export function TrendExplorerPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <FormatPickerDialog
+        trendId={selected?.id ?? 0}
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+      />
     </div>
   )
 }
