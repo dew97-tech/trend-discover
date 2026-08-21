@@ -45,7 +45,10 @@ class DashboardController extends Controller
                             'trend_title' => $post->trend?->title,
                             'updated_at' => $post->updated_at?->toIso8601String(),
                         ],
-                    ),
+                        // IMPORTANT: plain arrays only cross the cache boundary —
+                        // Collections unserialize as __PHP_Incomplete_Class
+                        // objects and break JSON contracts on cache hits.
+                    )->values()->all(),
                     'generated_posts' => array_sum($this->posts->countsByStatus()),
                     'pending_review' => $this->posts->countsByStatus()['review'] ?? 0,
                     'published' => $this->posts->countsByStatus()['published'] ?? 0,
