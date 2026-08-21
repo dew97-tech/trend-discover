@@ -52,9 +52,11 @@ class SourceSeeder extends Seeder
                 'base_url' => 'https://dev.to/api',
                 'config' => [
                     'tags' => ['php', 'laravel', 'javascript', 'typescript', 'react', 'devops', 'sql', 'performance'],
-                    'top_articles_window_days' => 7,
-                    'min_reactions' => 100,
-                    'rate_limit_per_second' => 1,
+                    // Public API ignores sort-by-popularity params, so this
+                    // source contributes FRESH niche articles; popularity
+                    // signals come from HN/Reddit/GitHub.
+                    'window_days' => 7,
+                    'min_reactions' => 5,
                 ],
             ],
             [
@@ -64,8 +66,8 @@ class SourceSeeder extends Seeder
                 'config' => [
                     'feeds' => [
                         ['name' => 'Laravel News', 'url' => 'https://laravel-news.com/feed'],
-                        ['name' => 'PHP Watch', 'url' => 'https://www.php.watch/feeds/all.xml'],
                         ['name' => 'InfoQ Engineering', 'url' => 'https://feed.infoq.com/'],
+                        ['name' => 'Smashing Magazine', 'url' => 'https://www.smashingmagazine.com/feed/'],
                     ],
                     'items_per_feed' => 25,
                 ],

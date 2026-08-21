@@ -16,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(
+            fn (\Illuminate\Auth\AuthenticationException $e, Request $request) => $request->is('api/*')
+                ? response()->json(['message' => 'Unauthenticated.'], 401)
+                : null,
+        );
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
