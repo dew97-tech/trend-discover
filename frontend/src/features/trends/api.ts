@@ -67,10 +67,6 @@ export interface GenerateSpec {
   angle?: string
 }
 
-export function generatePost(trendId: number, spec: GenerateSpec): Promise<{ message: string }> {
-  return api(`/trends/${trendId}/generate`, { method: 'POST', body: spec })
-}
-
 export interface ContentPost {
   id: number
   trend?: { id: number; title: string } | null
@@ -90,15 +86,34 @@ export interface ContentPost {
   generated_at: string | null
 }
 
-export function fetchPosts(filters: { trend_id?: string } = {}): Promise<PaginatedPosts> {
-  const params = new URLSearchParams()
-  if (filters.trend_id) params.set('filter[trend_id]', filters.trend_id)
+export function generatePost(trendId: number, spec: GenerateSpec): Promise<{ message: string }> {
+  return api(`/trends/${trendId}/generate`, { method: 'POST', body: spec })
+}
 
-  return api<PaginatedPosts>(`/posts?${params.toString()}`)
+export interface ContentPostFilters {
+  status?: string
+  format?: string
+  trend_id?: string
+  search?: string
+  per_page?: string
+  cursor?: string
 }
 
 export interface PaginatedPosts {
   data: ContentPost[]
+  next_cursor: string | null
+}
+
+export function fetchPosts(filters: ContentPostFilters = {}): Promise<PaginatedPosts> {
+  const params = new URLSearchParams()
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key === 'cursor' ? 'cursor' : `filter[${key}]`, value)
+  })
+
+  if (!filters.cursor) params.set('per_page', '12')
+
+  return api<PaginatedPosts>(`/posts?${params.toString()}`)
 }
 
 export function fetchPost(id: number): Promise<{ data: ContentPost }> {

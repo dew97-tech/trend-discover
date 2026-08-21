@@ -31,9 +31,26 @@ class DashboardController extends Controller
                     'new_trends' => array_sum($this->trends->statusCounts()) ?: 0,
                     'high_potential' => $this->trends->highPotentialCount(),
                     'trending_now' => \App\Http\Resources\TrendResource::collection($top)->resolve(),
+                    'recommended' => \App\Http\Resources\TrendResource::collection(
+                        $this->trends->recommended(4),
+                    )->resolve(),
+                    'recent_content' => $this->posts->recent(4)->map(
+                        fn ($post) => [
+                            'id' => $post->id,
+                            'title' => $post->title,
+                            'hook' => $post->hook,
+                            'status' => $post->status->value,
+                            'format' => $post->format,
+                            'quality_score' => (float) $post->quality_score,
+                            'trend_title' => $post->trend?->title,
+                            'updated_at' => $post->updated_at?->toIso8601String(),
+                        ],
+                    ),
                     'generated_posts' => array_sum($this->posts->countsByStatus()),
                     'pending_review' => $this->posts->countsByStatus()['review'] ?? 0,
                     'published' => $this->posts->countsByStatus()['published'] ?? 0,
+                    'queue_count' => ($this->posts->countsByStatus()['review'] ?? 0)
+                        + ($this->posts->countsByStatus()['ready'] ?? 0),
                     'recent_items_7d' => $this->items->countSince(7),
                     'failed_jobs_24h' => $this->jobRuns->failureCountSince(24),
                 ];

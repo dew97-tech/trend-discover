@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Eloquent;
 
+use App\Enums\PostStatus;
 use App\Models\ContentPost;
 use App\Models\ContentVersion;
 use App\Repositories\Contracts\ContentPostRepositoryInterface;
@@ -14,9 +15,26 @@ class ContentPostRepository implements ContentPostRepositoryInterface
     {
         return ContentPost::query()
             ->with(['trend:id,title', 'images' => fn ($q) => $q->select(['id', 'content_post_id', 'type', 'status', 'file_path'])])
-            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['status'] ?? null, function ($q, $status) {
+                // Comma-separated statuses: ?status=review,ready
+                $statuses = collect(explode(',', (string) $status))
+                    ->map(fn ($s) => trim($s))
+                    ->filter(fn ($s) => PostStatus::tryFrom($s) !== null)
+                    ->all();
+
+                return $statuses === [] ? $q : $q->whereIn('status', $statuses);
+            })
             ->when($filters['format'] ?? null, fn ($q, $format) => $q->where('format', $format))
             ->when($filters['trend_id'] ?? null, fn ($q, $trendId) => $q->where('trend_id', $trendId))
+            ->when(
+                $filters['search'] ?? null,
+                fn ($q, $search) => $q->where(function ($q) use ($search) {
+                    $term = '%'.$search.'%';
+                    $q->where('title', 'like', $term)
+                        ->orWhere('hook', 'like', $term)
+                        ->orWhere('body', 'like', $term);
+                }),
+            )
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->cursorPaginate($perPage);
@@ -69,5 +87,15 @@ class ContentPostRepository implements ContentPostRepositoryInterface
             ->groupBy('status')
             ->pluck('aggregate', 'status')
             ->all();
+    }
+
+    public function recent(int $limit = 4): \Illuminate\Support\Collection
+    {
+        return ContentPost::query()
+            ->with('trend:id,title')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get(['id', 'trend_id', 'title', 'hook', 'status', 'format', 'quality_score']);
     }
 }

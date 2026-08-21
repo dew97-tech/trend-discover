@@ -16,5 +16,7 @@ interface TrendRepositoryInterface
 
     public function highPotentialCount(float $threshold = 75.0): int;
 
+    public function recommended(int $limit = 4): Collection;
+
     public function findWithRelations(int $id): ?Trend;
 }

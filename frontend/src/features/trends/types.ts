@@ -17,7 +17,7 @@ export interface Trend {
   technologies?: Array<{ id: number; name: string; slug: string }>
   scores: TrendScores
   item_count: number
-  has_post?: boolean
+  has_post?: boolean | null
   first_seen_at: string | null
   last_seen_at: string | null
 }

@@ -54,6 +54,30 @@ class PostController extends Controller
         return new PostResource($post->fresh(['trend:id,title'])->loadCount('versions'));
     }
 
+    public function updateStatus(\Illuminate\Http\Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:draft,review,ready,archived'],
+        ]);
+
+        $post = ContentPost::query()->find($id);
+        abort_unless($post !== null, 404);
+
+        // Published is exclusive to the future publishing flow.
+        if ($post->status === \App\Enums\PostStatus::Published) {
+            return response()->json([
+                'message' => 'Published posts cannot change state here.',
+            ], 422);
+        }
+
+        $post->forceFill(['status' => $validated['status']])->save();
+
+        return response()->json([
+            'message' => "Post moved to {$validated['status']}.",
+            'data' => new PostResource($post->fresh(['trend:id,title'])->loadCount('versions')),
+        ]);
+    }
+
     public function regenerate(int $id): JsonResponse
     {
         $post = ContentPost::query()->with('trend')->find($id);

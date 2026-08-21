@@ -9,6 +9,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { TrendExplorerPage } from '@/features/trends/TrendExplorerPage'
 import { PostStudioPage } from '@/features/studio/PostStudioPage'
 import { PostEditorPage } from '@/features/studio/PostEditorPage'
+import { LibraryPage } from '@/features/library/LibraryPage'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="/trends" element={<TrendExplorerPage />} />
               <Route path="/studio" element={<PostStudioPage />} />
               <Route path="/studio/:id" element={<PostEditorPage />} />
+              <Route path="/library" element={<LibraryPage />} />
               <Route
                 path="*"
                 element={

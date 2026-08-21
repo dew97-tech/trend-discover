@@ -15,4 +15,6 @@ interface ContentPostRepositoryInterface
     public function saveNewVersion(ContentPost $post, string $createdBy = 'user'): ContentVersion;
 
     public function countsByStatus(): array;
+
+    public function recent(int $limit = 4): \Illuminate\Support\Collection;
 }

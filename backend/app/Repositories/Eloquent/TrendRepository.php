@@ -83,6 +83,24 @@ class TrendRepository implements TrendRepositoryInterface
             ->count();
     }
 
+    /**
+     * Top-scored trends regardless of post existence — the dashboard's
+     * "Recommended Topics" action list (user decision, Phase 6).
+     */
+    public function recommended(int $limit = 4): Collection
+    {
+        return Trend::query()
+            ->active()
+            ->ranked()
+            ->with('category:id,name,slug')
+            ->withExists('posts as has_post')
+            ->limit($limit)
+            ->get([
+                'id', 'title', 'category_id', 'trend_score',
+                'novelty_score', 'saturation_score', 'item_count',
+            ]);
+    }
+
     public function findWithRelations(int $id): ?Trend
     {
         return Trend::query()

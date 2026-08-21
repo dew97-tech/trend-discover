@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/posts', [PostController::class, 'index']);
     Route::get('/posts/{id}', [PostController::class, 'show']);
     Route::patch('/posts/{id}', [PostController::class, 'update']);
+    Route::post('/posts/{id}/status', [PostController::class, 'updateStatus']);
     Route::post('/posts/{id}/regenerate', [PostController::class, 'regenerate']);
 
     // Visual assets for posts
