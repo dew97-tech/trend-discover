@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Trend Discover — Semantic Design Tokens
+ * Foundation: LinkedIn-inspired palette (docs/PLAN.md §Brand)
+ * Rule: neutral-dominant surfaces; color reserved for meaning.
+ */
+
+:root {
+  /* Core brand */
+  --science-blue: #0a66c2;
+  --congress-blue: #004182;
+
+  /* Semantic */
+  --background: #fdfaf5;
+  --foreground: #38434f;
+  --surface: #ffffff;
+  --surface-muted: #f6f3ee;
+  --card: #ffffff;
+  --card-foreground: #38434f;
+  --popover: #ffffff;
+  --popover-foreground: #38434f;
+  --primary: #0a66c2;
+  --primary-foreground: #ffffff;
+  --primary-hover: #004182;
+  --secondary: #e9e5df;
+  --secondary-foreground: #38434f;
+  --muted: #eef0f2;
+  --muted-foreground: #56687a;
+  --accent: #dce6f1;
+  --accent-foreground: #004182;
+  --destructive: #b24020;
+  --destructive-foreground: #ffffff;
+  --border: #e3ded6;
+  --input: #dce6f1;
+  --ring: #0a66c2;
+
+  /* Status */
+  --success: #44712e;
+  --success-soft: #d7ebce;
+  --warning: #e7a33e;
+  --warning-soft: #fce2ba;
+  --danger: #b24020;
+  --danger-soft: #fadfd8;
+  --info: #0a66c2;
+  --info-soft: #dce6f1;
+
+  /* Trend tiers */
+  --trend-high: #44712e;
+  --trend-medium: #e7a33e;
+  --trend-low: #915907;
+
+  /* Charts / data-viz accents */
+  --geraldine: #f5987e;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #232b33;
+  --foreground: #e9e5df;
+  --surface: #2c3540;
+  --surface-muted: #38434f;
+  --card: #2c3540;
+  --card-foreground: #e9e5df;
+  --popover: #2c3540;
+  --popover-foreground: #e9e5df;
+  --primary: #3b87d1;
+  --primary-foreground: #ffffff;
+  --primary-hover: #0a66c2;
+  --secondary: #38434f;
+  --secondary-foreground: #dce6f1;
+  --muted: #38434f;
+  --muted-foreground: #a8b4bf;
+  --accent: #38434f;
+  --accent-foreground: #dce6f1;
+  --destructive: #d95f3b;
+  --destructive-foreground: #ffffff;
+  --border: #3d4956;
+  --input: #3d4956;
+  --ring: #3b87d1;
+
+  --success: #6fa14f;
+  --success-soft: #2f4025;
+  --warning: #edb258;
+  --warning-soft: #443722;
+  --danger: #e06b48;
+  --danger-soft: #46291f;
+  --info: #3b87d1;
+  --info-soft: #24384d;
+
+  --trend-high: #6fa14f;
+  --trend-medium: #edb258;
+  --trend-low: #c07d1f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-trend-high: var(--trend-high);
+  --color-trend-medium: var(--trend-medium);
+  --color-trend-low: var(--trend-low);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
