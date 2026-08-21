@@ -95,6 +95,16 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 | Saturation sibling threshold | `SaturationAnalyzer` 0.45 | what counts as duplicate coverage |
 | Source filters (min points/stars/score, windows) | `sources.config` JSON | per-source quality bar |
 | Junk flag thresholds | `TrendClusterer::qualityFlags()` | star-farm detection sensitivity |
+| AI model | `.env` `OPENCODE_GO_MODEL` | allowlist: ox-alpha-free, hy3, mimo-v2.5 |
+
+## 8b. OpenCode Go gateway notes
+
+- `OPENCODE_GO_BASE_URL` = **API root** (e.g. `https://opencode.ai/zen/go/v1`).
+  The provider appends `/chat/completions`; pasting the full endpoint also works
+  (defensively normalized in `OpenCodeGoProvider::apiRoot()`).
+- Reasoning models may return EMPTY visible content when truncated at
+  `max_tokens` — ceiling is 4096 and the provider silently re-attempts once.
+- Model output is decoded defensively: direct JSON → markdown-fenced → brace-extracted.
 
 ## 9. Git conventions
 
