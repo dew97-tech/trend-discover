@@ -73,6 +73,7 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 | 401 from GitHub in worker but OK in tinker | stale long-running processes hold old config | kill stray `php.exe artisan serve`/workers (`tasklist`, `taskkill //PID x //F`) |
 | Eloquent says table `source_item_trend` missing | default pivot naming vs our migration | pivot names are explicit in all `belongsToMany` calls |
 | Titles like `[Dev.to/php] …` block cross-source merge | collector prefixes pollute shingles | stripped inside `TitleSimilarity::tokenize` |
+| **API field is `{}` object but only on some requests** | rich object (Collection/Model) cached via `Cache::remember`; unserialize → `__PHP_Incomplete_Class` → JSON object | **Plain arrays/scalars only ever cross a cache boundary** (`->values()->all()` / `->resolve()`). See DashboardController §recent_content. Blank screens client-side = check ErrorBoundary output first. |
 
 ## 7. Adding a new source (checklist)
 
