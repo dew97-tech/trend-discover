@@ -98,13 +98,17 @@ class TrendController extends Controller
     public function taxonomy(CacheRepository $cache): JsonResponse
     {
         $payload = $cache->remember('taxonomy:categories-technologies', now()->addHours(24), fn () => [
+            // Plain arrays only cross the cache boundary — Collections
+            // unserialize as __PHP_Incomplete_Class on cache hits.
             'categories' => Category::query()
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug']),
+                ->get(['id', 'name', 'slug'])
+                ->toArray(),
             'technologies' => Technology::query()
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'category_id']),
+                ->get(['id', 'name', 'slug', 'category_id'])
+                ->toArray(),
         ]);
 
         return response()->json($payload);

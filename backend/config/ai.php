@@ -39,6 +39,8 @@ return [
     | Cost control
     |--------------------------------------------------------------------------
     | Hard ceilings enforced in code; soft targets live in system_settings.
+    | max_tokens must leave room for reasoning models' invisible chain-of-
+    | thought — 2000 caused empty visible content on truncation.
     */
-    'max_tokens_per_call' => 2000,
+    'max_tokens_per_call' => 4096,
 ];
