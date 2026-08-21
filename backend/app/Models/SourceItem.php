@@ -31,7 +31,7 @@ class SourceItem extends Model
 
     public function trends(): BelongsToMany
     {
-        return $this->belongsToMany(Trend::class);
+        return $this->belongsToMany(Trend::class, 'trend_source_item', 'source_item_id', 'trend_id');
     }
 
     public function scopeRecent(Builder $query, int $days = 30): Builder

@@ -57,6 +57,13 @@ class CollectSourceItemsJob implements ShouldBeUnique, ShouldQueue
                 'duplicates_skipped' => max(0, count($rows) - $inserted),
             ]);
 
+            // Auto-chain: newly inserted items flow straight into
+            // clustering + scoring. ShouldBeUnique collapses concurrent
+            // chains into a single detection run.
+            if ($inserted > 0) {
+                DetectTrendsJob::dispatch();
+            }
+
             Log::info('Collection finished', [
                 'source' => $this->source->name,
                 'fetched' => count($rows),

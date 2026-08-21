@@ -44,12 +44,12 @@ class Trend extends Model
 
     public function technologies(): BelongsToMany
     {
-        return $this->belongsToMany(Technology::class);
+        return $this->belongsToMany(Technology::class, 'trend_technology', 'trend_id', 'technology_id');
     }
 
     public function sourceItems(): BelongsToMany
     {
-        return $this->belongsToMany(SourceItem::class);
+        return $this->belongsToMany(SourceItem::class, 'trend_source_item', 'trend_id', 'source_item_id');
     }
 
     public function posts(): HasMany
