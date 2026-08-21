@@ -36,13 +36,14 @@ class SourceSeeder extends Seeder
                 ],
             ],
             [
-                'name' => 'reddit',
-                'type' => SourceType::Reddit,
-                'base_url' => 'https://oauth.reddit.com',
+                'name' => 'lobsters',
+                'type' => SourceType::LobsteRs,
+                'base_url' => 'https://lobste.rs',
                 'config' => [
-                    'subreddits' => ['programming', 'laravel', 'webdev', 'javascript', 'devops', 'ExperiencedDevs'],
-                    'min_upvotes' => 50,
-                    'listing_window_hours' => 72,
+                    'listing' => 'hottest',
+                    'pages' => 2,
+                    'min_score' => 15,
+                    'window_hours' => 72,
                     'rate_limit_per_minute' => 10,
                 ],
             ],
@@ -54,7 +55,7 @@ class SourceSeeder extends Seeder
                     'tags' => ['php', 'laravel', 'javascript', 'typescript', 'react', 'devops', 'sql', 'performance'],
                     // Public API ignores sort-by-popularity params, so this
                     // source contributes FRESH niche articles; popularity
-                    // signals come from HN/Reddit/GitHub.
+                    // signals come from HN/Lobsters/GitHub.
                     'window_days' => 7,
                     'min_reactions' => 5,
                 ],

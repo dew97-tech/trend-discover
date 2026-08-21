@@ -13,9 +13,9 @@ class CollectorFactory
         return match ($source->type) {
             SourceType::HackerNews => app(HnCollector::class),
             SourceType::GitHub => app(GitHubCollector::class),
-            SourceType::Reddit => app(RedditCollector::class),
             SourceType::DevTo => app(DevToCollector::class),
             SourceType::Rss => app(RssCollector::class),
+            SourceType::LobsteRs => app(LobsteRsCollector::class),
         };
     }
 }

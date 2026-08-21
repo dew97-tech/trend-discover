@@ -37,7 +37,9 @@ final class GitHubCollector implements CollectorInterface
             ]);
 
         if ($response->failed()) {
-            throw new ConnectionException("GitHub search failed: {$response->status()}");
+            throw new ConnectionException(
+                "GitHub search failed: {$response->status()} ".str($response->body())->limit(180),
+            );
         }
 
         return collect($response->json('items', []))
