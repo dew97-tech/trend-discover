@@ -111,6 +111,11 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
     2. On empty+length: lower effort one step, then double max_tokens (up to ×4)
     3. Truthful error after ladder exhaustion — never a generic "empty content"
 - Profiles live in `config/ai.php`; model switchable at runtime via Settings.
+- ⚠️ **Go-tier model IDs differ from the public Zen docs table.** Verified live:
+  `ox-alpha-free`, `hy3`, `mimo-v2.5` (docs list `mimo-v2.5-free` / `x-preview-f-free`
+  for the general tier — those 401 on the Go endpoint). Trust only the
+  `on_gateway` flag from `GET /api/settings/models`; unavailable models are
+  disabled in the Settings picker and can't be selected.
 
 ## 8c. Pipeline logging
 

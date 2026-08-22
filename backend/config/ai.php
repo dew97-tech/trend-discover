@@ -36,12 +36,15 @@ return [
             |   max_output       — safe max_tokens ceiling for this model
             */
             'allowed_models' => [
+                // NOTE: the Go tier (/zen/go/v1) exposes its own ids — always
+                // cross-check against GET /settings/models (on_gateway flag)
+                // rather than the public Zen docs table.
                 'ox-alpha-free' => [
                     'label' => 'Ox Alpha Free',
                     'reasoning' => false,
                     'max_output' => 4096,
                 ],
-                'mimo-v2.5-free' => [
+                'mimo-v2.5' => [
                     'label' => 'MiMo-V2.5 Free',
                     'reasoning' => true,
                     'effort' => 'low',

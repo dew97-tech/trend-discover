@@ -196,7 +196,16 @@ export function SettingsPage() {
             </SelectTrigger>
             <SelectContent>
               {models.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
+                <SelectItem
+                  key={m.id}
+                  value={m.id}
+                  disabled={!m.on_gateway}
+                  title={
+                    m.on_gateway
+                      ? undefined
+                      : 'Not available on your gateway right now — cannot be selected.'
+                  }
+                >
                   <span className="flex items-center gap-2">
                     {m.label}
                     {m.reasoning ? (
@@ -204,7 +213,9 @@ export function SettingsPage() {
                     ) : null}
                     {m.on_gateway ? (
                       <Badge variant="secondary" className="px-1 py-0 text-[10px]">live</Badge>
-                    ) : null}
+                    ) : (
+                      <Badge variant="destructive" className="px-1 py-0 text-[10px]">offline</Badge>
+                    )}
                   </span>
                 </SelectItem>
               ))}
@@ -213,6 +224,8 @@ export function SettingsPage() {
           <p className="mt-2 text-xs text-muted-foreground">
             Allowlisted models only. <Badge variant="secondary" className="mx-0.5 px-1 py-0 text-[10px]">live</Badge>
             = available on the gateway right now ·
+            <Badge variant="destructive" className="mx-0.5 px-1 py-0 text-[10px]">offline</Badge>
+            = gateway doesn't serve it (selection blocked) ·
             <Badge variant="outline" className="mx-0.5 px-1 py-0 text-[10px]">reasoning</Badge>
             = thinks before answering (slower, deeper — budget auto-managed).
           </p>

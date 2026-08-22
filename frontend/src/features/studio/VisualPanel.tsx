@@ -49,7 +49,7 @@ export function VisualPanel({ post }: Props) {
     setBusy('snippet')
     suggestSnippet(post.id, force)
       .then(() => refresh())
-      .catch(() => toast.error('Snippet suggestion failed.'))
+      .catch((err: Error) => toast.error(err.message || 'Snippet suggestion failed.'))
       .finally(() => setBusy(null))
   }
 
