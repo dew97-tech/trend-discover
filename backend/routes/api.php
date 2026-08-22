@@ -36,6 +36,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/jobs', [JobRunController::class, 'index']);
     Route::get('/jobs/{id}/log', [JobRunController::class, 'log']);
 
+    // Manual pipeline triggers
+    Route::post('/pipeline/detect', function (): JsonResponse {
+        \App\Jobs\DetectTrendsJob::dispatch();
+
+        \Illuminate\Support\Facades\Log::channel('pipeline')
+            ->info('[PipelineController] detection dispatched manually');
+
+        return response()->json(['message' => 'Trend detection queued.'], 202);
+    });
+
     Route::get('/settings', [SettingController::class, 'index']);
     Route::patch('/settings', [SettingController::class, 'update']);
     Route::get('/settings/models', [SettingController::class, 'models']);
@@ -45,6 +55,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/trends/{id}', [TrendController::class, 'show']);
     Route::post('/trends/{id}/rescore', [TrendController::class, 'rescore']);
     Route::post('/trends/{id}/generate', [TrendController::class, 'generate']);
+    Route::delete('/trends/{id}', [TrendController::class, 'destroy']);
+    Route::post('/trends/{id}/restore', [TrendController::class, 'restore']);
 
     Route::get('/posts', [PostController::class, 'index']);
     Route::get('/posts/{id}', [PostController::class, 'show']);

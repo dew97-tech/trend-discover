@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Search, Radar, RefreshCw, X, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Search, Radar, RefreshCw, X, Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { fetchTrends, fetchTaxonomy, fetchTrend, rescoreTrend, type Taxonomy, type TrendDetail } from './api'
+import { fetchTrends, fetchTaxonomy, fetchTrend, rescoreTrend, deleteTrend, type Taxonomy, type TrendDetail } from './api'
 import { FormatPickerDialog } from './FormatPickerDialog'
 import { scoreTier, type Trend } from './types'
 import { cn } from '@/lib/utils'
@@ -66,6 +66,8 @@ export function TrendExplorerPage() {
   const [selected, setSelected] = useState<TrendDetail | null>(null)
   const [rescoring, setRescoring] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 350)
@@ -89,7 +91,7 @@ export function TrendExplorerPage() {
     [debouncedSearch, categoryId, minScore, dateRange],
   )
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true)
     setSelected(null)
 
@@ -101,6 +103,10 @@ export function TrendExplorerPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load trends'))
       .finally(() => setLoading(false))
   }, [filters])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   function loadMore() {
     if (!nextCursor) return
@@ -120,6 +126,21 @@ export function TrendExplorerPage() {
     fetchTrend(trend.id)
       .then(setSelected)
       .catch(() => toast.error('Could not load trend details.'))
+  }
+
+  function handleDelete() {
+    if (!selected) return
+    setDeleting(true)
+
+    deleteTrend(selected.id)
+      .then(() => {
+        toast.success('Trend deleted — its source items are free to re-cluster.')
+        setConfirmDelete(false)
+        setSelected(null)
+        load()
+      })
+      .catch((err: Error) => toast.error(err.message || 'Delete failed.'))
+      .finally(() => setDeleting(false))
   }
 
   function handleRescore() {
@@ -378,15 +399,25 @@ export function TrendExplorerPage() {
                 ) : null}
               </div>
 
-              <div className="flex shrink-0 justify-end gap-2 border-t pt-3">
-                <Button variant="outline" size="sm" onClick={handleRescore} disabled={rescoring}>
-                  <RefreshCw className={cn('size-3.5', rescoring && 'animate-spin')} />
-                  Re-score
-                </Button>
-                <Button size="sm" onClick={() => setPickerOpen(true)}>
-                  <Sparkles className="size-3.5" />
-                  Generate Post
-                </Button>
+              <div className="flex shrink-0 items-center justify-between gap-2 border-t pt-3">
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-danger disabled:opacity-50"
+                  disabled={deleting}
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  Delete trend
+                </button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleRescore} disabled={rescoring}>
+                    <RefreshCw className={cn('size-3.5', rescoring && 'animate-spin')} />
+                    Re-score
+                  </Button>
+                  <Button size="sm" onClick={() => setPickerOpen(true)}>
+                    <Sparkles className="size-3.5" />
+                    Generate Post
+                  </Button>
+                </div>
               </div>
             </>
           ) : (
@@ -395,6 +426,32 @@ export function TrendExplorerPage() {
               <X className="hidden" />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(false)
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-left text-base">Delete this trend?</DialogTitle>
+            <DialogDescription className="text-left">
+              It will disappear from all lists. Its {selected?.item_count ?? 0} source items are
+              freed for future clustering, and the trend can be restored via API if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : null}
+              Delete trend
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

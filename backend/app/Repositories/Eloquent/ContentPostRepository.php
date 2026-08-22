@@ -14,7 +14,8 @@ class ContentPostRepository implements ContentPostRepositoryInterface
     public function filterPaginated(array $filters, int $perPage = 20): CursorPaginator
     {
         return ContentPost::query()
-            ->with(['trend:id,title', 'images' => fn ($q) => $q->select(['id', 'content_post_id', 'type', 'status', 'file_path'])])
+            ->with(['trend' => fn ($q) => $q->withTrashed()->select(['id', 'title'])])
+            ->with(['images' => fn ($q) => $q->select(['id', 'content_post_id', 'type', 'status', 'file_path'])])
             ->when($filters['status'] ?? null, function ($q, $status) {
                 // Comma-separated statuses: ?status=review,ready
                 $statuses = collect(explode(',', (string) $status))
@@ -92,7 +93,7 @@ class ContentPostRepository implements ContentPostRepositoryInterface
     public function recent(int $limit = 4): \Illuminate\Support\Collection
     {
         return ContentPost::query()
-            ->with('trend:id,title')
+            ->with(['trend' => fn ($q) => $q->withTrashed()->select(['id', 'title'])])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->limit($limit)

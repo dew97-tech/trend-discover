@@ -10,7 +10,10 @@ use App\Services\AI\Concerns\LogsAiGenerations;
 /**
  * Derives a shareable code-snippet card spec from a generated post.
  * The spec is rendered client-side (ray.so-style) — no server image work.
- * One snippet per post: regeneration replaces the spec.
+ *
+ * Flow (async since Phase 7.6): the controller creates a PENDING row and
+ * queues SuggestSnippetJob; this service performs only the AI call and
+ * returns the raw spec. The job fills the row and flips status to ready.
  */
 class SnippetService
 {
@@ -22,24 +25,17 @@ class SnippetService
     ) {}
 
     /**
-     * @return array{image: ContentImage, cached: bool}
+     * Pure AI derivation — no database writes.
+     *
+     * @return array{code: string, language: string, title: string}
      */
-    public function suggestFor(ContentPost $post, bool $force = false): array
+    public function buildSpec(ContentPost $post): array
     {
         $requestHash = hash('sha256', implode('|', [
             'snippet',
             $post->id,
             md5($post->body),
         ]));
-
-        $existing = ContentImage::query()
-            ->where('content_post_id', $post->id)
-            ->where('type', ImageType::CodeSnippet->value)
-            ->first();
-
-        if (! $force && $existing !== null && $existing->spec !== null) {
-            return ['image' => $existing, 'cached' => true];
-        }
 
         $prompt = $this->prompts->render('snippet.user', [
             'post_body' => str($post->body)->limit(3000),
@@ -52,24 +48,6 @@ class SnippetService
 
         $data = $response->data;
 
-        $spec = [
-            // Default card styling lives client-side; AI only supplies content.
-            'code' => str((string) ($data['code'] ?? '// nothing to show'))->limit(1200),
-            'language' => in_array(($data['language'] ?? 'other'), [
-                'php', 'javascript', 'typescript', 'python', 'sql', 'bash', 'go', 'rust',
-            ], true) ? $data['language'] : 'other',
-            'title' => str((string) ($data['title'] ?? 'Snippet'))->limit(60),
-        ];
-
-        $image = ContentImage::query()->updateOrCreate(
-            ['content_post_id' => $post->id, 'type' => ImageType::CodeSnippet->value],
-            [
-                'status' => 'ready',
-                'spec' => $spec,
-                'generated_at' => now(),
-            ],
-        );
-
         $this->logGeneration(
             provider: class_basename($this->manager->provider()),
             kind: 'snippet',
@@ -79,6 +57,21 @@ class SnippetService
             postId: $post->id,
         );
 
-        return ['image' => $image, 'cached' => false];
+        return [
+            'code' => str((string) ($data['code'] ?? '// nothing to show'))->limit(1200),
+            'language' => in_array(($data['language'] ?? 'other'), [
+                'php', 'javascript', 'typescript', 'python', 'sql', 'bash', 'go', 'rust',
+            ], true) ? $data['language'] : 'other',
+            'title' => str((string) ($data['title'] ?? 'Snippet'))->limit(60),
+        ];
+    }
+
+    public function hasReadySnippet(ContentPost $post): bool
+    {
+        return ContentImage::query()
+            ->where('content_post_id', $post->id)
+            ->where('type', ImageType::CodeSnippet->value)
+            ->where('status', 'ready')
+            ->exists();
     }
 }

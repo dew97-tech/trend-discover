@@ -33,11 +33,24 @@ export function VisualPanel({ post }: Props) {
 
   const snippet = images?.snippet ?? null
   const prompts = images?.prompts ?? []
+  const hasPending =
+    snippet?.status === 'pending' || prompts.some((p) => p.status === 'pending')
+  const failedSnippet = images?.failedSnippet ?? null
 
   useEffect(() => {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id])
+
+  // Poll while anything is pending — jobs run in workers (AI calls take
+  // 30–90s+), so the UI must self-update.
+  useEffect(() => {
+    if (!hasPending) return
+
+    const timer = setInterval(refresh, 2500)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPending])
 
   function refresh() {
     fetchPostImages(post.id)
@@ -48,7 +61,7 @@ export function VisualPanel({ post }: Props) {
   function handleSuggest(force: boolean) {
     setBusy('snippet')
     suggestSnippet(post.id, force)
-      .then(() => refresh())
+      .then(refresh)
       .catch((err: Error) => toast.error(err.message || 'Snippet suggestion failed.'))
       .finally(() => setBusy(null))
   }
@@ -56,10 +69,7 @@ export function VisualPanel({ post }: Props) {
   function handlePrompt() {
     setBusy('prompt')
     generateImagePrompt(post.id)
-      .then(() => {
-        refresh()
-        toast.success('Prompt generated — copy it into your image tool.')
-      })
+      .then(refresh)
       .catch((err: Error) => toast.error(err.message || 'Prompt generation failed.'))
       .finally(() => setBusy(null))
   }
@@ -142,7 +152,23 @@ export function VisualPanel({ post }: Props) {
           ) : null}
         </div>
 
-        {snippet ? (
+        {snippet && snippet.status === 'pending' ? (
+          <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-xs text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" />
+            AI is crafting your snippet card… this can take up to a minute.
+          </div>
+        ) : failedSnippet ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-danger-soft p-3 text-xs text-danger">
+            <span>Snippet generation failed.</span>
+            <button
+              type="button"
+              className="font-semibold underline"
+              onClick={() => handleSuggest(true)}
+            >
+              retry
+            </button>
+          </div>
+        ) : snippet ? (
           <div className="space-y-2">
             <CodeCard
               ref={cardRef}
@@ -181,30 +207,50 @@ export function VisualPanel({ post }: Props) {
           </Button>
         </div>
 
-        {prompts.map((img) => (
-          <div key={img.id} className="rounded-md border bg-surface-muted p-2.5">
-            <p className="text-[11px] leading-relaxed">{img.prompt_text}</p>
-            <div className="mt-1.5 flex items-center justify-between">
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-                onClick={() => {
-                  navigator.clipboard.writeText(img.prompt_text ?? '')
-                  toast.success('Prompt copied.')
-                }}
-              >
-                <CopyIcon /> copy prompt
-              </button>
-              <button
-                type="button"
-                className="text-[11px] text-muted-foreground hover:text-danger"
-                onClick={() => deleteImage(img.id).then(refresh)}
-              >
-                remove
-              </button>
+        {prompts
+          .filter((img) => img.status !== 'pending')
+          .map((img) => (
+            <div key={img.id} className="rounded-md border bg-surface-muted p-2.5">
+              {img.status === 'failed' ? (
+                <p className="text-[11px] text-danger">
+                  This prompt failed to generate — try again.
+                </p>
+              ) : (
+                <p className="text-[11px] leading-relaxed">{img.prompt_text}</p>
+              )}
+              {img.status === 'ready' ? (
+                <div className="mt-1.5 flex items-center justify-between">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(img.prompt_text ?? '')
+                      toast.success('Prompt copied.')
+                    }}
+                  >
+                    <CopyIcon /> copy prompt
+                  </button>
+                  <button
+                    type="button"
+                    className="text-[11px] text-muted-foreground hover:text-danger"
+                    onClick={() => deleteImage(img.id).then(refresh)}
+                  >
+                    remove
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-1.5 text-right">
+                  <button
+                    type="button"
+                    className="text-[11px] text-muted-foreground hover:text-danger"
+                    onClick={() => deleteImage(img.id).then(refresh)}
+                  >
+                    remove
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          ))}
 
         {/* Manual upload */}
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">
@@ -259,21 +305,16 @@ function CopyIcon() {
 
 interface ImagesState {
   snippet: SnippetImage | null
-  prompts: PromptImage[]
-  uploads: UploadImage[]
+  pendingSnippet: SnippetImage | null
+  failedSnippet: SnippetImage | null
+  prompts: SnippetImage[]
+  uploads: SnippetImage[]
 }
 
 interface SnippetImage {
   id: number
+  status: 'pending' | 'ready' | 'failed'
   spec: CodeCardSpec | null
-}
-
-interface PromptImage {
-  id: number
   prompt_text: string | null
-}
-
-interface UploadImage {
-  id: number
   url: string | null
 }

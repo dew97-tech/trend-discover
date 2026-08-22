@@ -54,6 +54,14 @@ export function rescoreTrend(id: number): Promise<{ message: string }> {
   return api(`/trends/${id}/rescore`, { method: 'POST' })
 }
 
+export function deleteTrend(id: number): Promise<{ message: string }> {
+  return api(`/trends/${id}`, { method: 'DELETE' })
+}
+
+export function runDetection(): Promise<{ message: string }> {
+  return api('/pipeline/detect', { method: 'POST' })
+}
+
 export interface Taxonomy {
   categories: Array<{ id: number; name: string; slug: string }>
   technologies: Array<{ id: number; name: string; slug: string; category_id: number | null }>

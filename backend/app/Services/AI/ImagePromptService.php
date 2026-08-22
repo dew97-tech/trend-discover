@@ -11,6 +11,10 @@ use App\Services\AI\Concerns\LogsAiGenerations;
 /**
  * Writes a detailed, post-aware image-generation prompt the user copies
  * into any external tool (Midjourney/DALL-E/etc). Cost-capped per post.
+ *
+ * Async since Phase 7.6: controller creates a PENDING row and queues
+ * GenerateImagePromptJob; this service performs the AI call and the job
+ * fills the row. Limit counting considers READY rows only.
  */
 class ImagePromptService
 {
@@ -21,20 +25,22 @@ class ImagePromptService
         private readonly PromptRegistry $prompts,
     ) {}
 
-    /**
-     * @return array{image: ContentImage, cached: bool}
-     */
-    public function generateFor(ContentPost $post): array
+    public function limitReached(ContentPost $post): bool
     {
-        $existingCount = ContentImage::query()
+        return ContentImage::query()
             ->where('content_post_id', $post->id)
             ->where('type', ImageType::Prompt->value)
-            ->count();
+            ->where('status', 'ready')
+            ->count() >= self::maxPerPost();
+    }
 
-        if ($existingCount >= $this->maxPerPost()) {
-            abort(422, 'Image-prompt limit reached for this post (max '.$this->maxPerPost().').');
-        }
-
+    /**
+     * Pure AI call — no database writes.
+     *
+     * @return array{prompt_text: string, negative_prompt: string}
+     */
+    public function buildPrompt(ContentPost $post): array
+    {
         // Re-use research as grounding so the prompt stays relevant to content.
         ['research' => $research] = app(ResearchService::class)->getOrGenerate($post->trend);
 
@@ -50,36 +56,26 @@ class ImagePromptService
 
         $data = $response->data;
 
-        $image = ContentImage::query()->create([
-            'content_post_id' => $post->id,
-            'type' => ImageType::Prompt->value,
-            'status' => 'ready',
-            'prompt_text' => str((string) ($data['prompt_text'] ?? ''))->limit(2000),
-            'spec' => [
-                'negative_prompt' => (string) ($data['negative_prompt'] ?? ''),
-                'suggested_style' => 'flat vector / isometric technical diagram',
-            ],
-            'generated_at' => now(),
-        ]);
-
         $this->logGeneration(
             provider: class_basename($this->manager->provider()),
             kind: 'image_prompt',
-            idempotencyKey: hash('sha256', "image_prompt|{$post->id}|".uniqid()),
+            idempotencyKey: hash('sha256', 'image_prompt|'.$post->id.'|'.uniqid()),
             requestHash: hash('sha256', implode('|', [
                 'image_prompt',
                 $post->id,
                 md5($post->body),
-                $existingCount,
             ])),
             response: $response,
             postId: $post->id,
         );
 
-        return ['image' => $image, 'cached' => false];
+        return [
+            'prompt_text' => str((string) ($data['prompt_text'] ?? ''))->limit(2000),
+            'negative_prompt' => (string) ($data['negative_prompt'] ?? ''),
+        ];
     }
 
-    private function maxPerPost(): int
+    public static function maxPerPost(): int
     {
         $limits = SystemSetting::get('generation.limits', []) ?? [];
 

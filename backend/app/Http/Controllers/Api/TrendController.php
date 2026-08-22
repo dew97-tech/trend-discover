@@ -8,7 +8,9 @@ use App\Http\Resources\TrendResource;
 use App\Jobs\CalculateTrendScoreJob;
 use App\Jobs\GeneratePostJob;
 use App\Models\Category;
+use App\Models\Trend;
 use App\Models\Technology;
+use Illuminate\Support\Facades\Log;
 use App\Repositories\Contracts\TrendRepositoryInterface;
 use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Http\JsonResponse;
@@ -73,6 +75,48 @@ class TrendController extends Controller
         CalculateTrendScoreJob::dispatch($id);
 
         return response()->json(['message' => "Re-score queued for trend #{$id}."], 202);
+    }
+
+    /**
+     * Soft delete: hides the trend everywhere, frees its source items for
+     * future clustering, keeps generated posts in the library.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $trend = $this->trends->findWithRelations($id);
+        abort_unless($trend !== null, 404);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($trend): void {
+            // Detach first so items are eligible for fresh clustering.
+            $trend->sourceItems()->detach();
+            $trend->delete();
+        });
+
+        Log::channel('pipeline')->info('[TrendController] trend soft-deleted', [
+            'trend_id' => $trend->id,
+            'title' => (string) str($trend->title)->limit(80),
+            'items_freed' => $trend->item_count,
+        ]);
+
+        return response()->json([
+            'message' => 'Trend deleted. Its source items are free to re-cluster, and it can be restored.',
+        ]);
+    }
+
+    public function restore(int $id): JsonResponse
+    {
+        $trend = Trend::withTrashed()->find($id);
+        abort_unless($trend !== null, 404);
+
+        if (! $trend->trashed()) {
+            return response()->json(['message' => 'Trend is not deleted.']);
+        }
+
+        $trend->restore();
+
+        Log::channel('pipeline')->info('[TrendController] trend restored', ['trend_id' => $id]);
+
+        return response()->json(['message' => 'Trend restored.']);
     }
 
     public function generate(\App\Http\Requests\GeneratePostRequest $request, int $id): JsonResponse

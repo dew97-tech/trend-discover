@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, ChevronDown, ChevronRight } from 'lucide-react'
+import { Activity, ChevronDown, ChevronRight, Loader2, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { runDetection } from '../trends/api'
 
 interface JobRun {
   id: number
@@ -35,6 +36,19 @@ export function JobsPage() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [expanded, setExpanded] = useState<number | null>(null)
   const [logLines, setLogLines] = useState<string[] | null>(null)
+  const [detecting, setDetecting] = useState(false)
+
+  function handleRunDetection() {
+    setDetecting(true)
+
+    runDetection()
+      .then(() => {
+        toast.success('Detection queued — new runs will appear below.')
+        setTimeout(load, 1500)
+      })
+      .catch(() => toast.error('Could not queue detection.'))
+      .finally(() => setDetecting(false))
+  }
 
   const load = useCallback(() => {
     api<{ data: JobRun[] }>('/jobs')
@@ -105,6 +119,16 @@ export function JobsPage() {
             />
             auto-refresh 5s
           </label>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRunDetection}
+            disabled={detecting}
+            title="Clusters ungrouped source items into trends and scores them"
+          >
+            {detecting ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+            Run detection
+          </Button>
           <Button variant="outline" size="sm" onClick={load}>
             Refresh
           </Button>

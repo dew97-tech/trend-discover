@@ -27,7 +27,10 @@ class PostController extends Controller
     public function show(int $id): PostResource
     {
         $post = ContentPost::query()
-            ->with(['trend:id,title', 'versions:id,content_post_id,version,created_by,created_at'])
+            ->with([
+                'trend' => fn ($q) => $q->withTrashed()->select(['id', 'title']),
+                'versions:id,content_post_id,version,created_by,created_at',
+            ])
             ->withCount('versions')
             ->find($id);
 

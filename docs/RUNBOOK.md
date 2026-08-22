@@ -123,6 +123,19 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
   tagged `[JobName run={id}]` — start/finish/verdicts/failures included.
 - `GET /api/jobs/{id}/log` returns that run's lines; the Pipeline Jobs screen
   expands rows to show them inline. Re-score toasts link straight to the screen.
+- **All AI operations are queued** — snippet suggestion and image prompts too
+  (`SuggestSnippetJob` / `GenerateImagePromptJob`, unique per post). Controllers
+  create `pending` ContentImage rows and return 202 instantly; workers fill them
+  (AI calls take 30–90s+, which would fatal inside web requests). Frontend polls
+  the images endpoint; failed rows surface a retry button.
+
+## 8d. Trend lifecycle
+
+- `DELETE /api/trends/{id}` = **soft delete**: trend hidden from all queries,
+  source items detached (free to re-cluster), generated posts preserved in library.
+- `POST /api/trends/{id}/restore` brings it back; both write to the pipeline log.
+- Manual detection: `POST /api/pipeline/detect` or the "Run detection" button
+  on Pipeline Jobs — same path as the auto-chain after collections.
 
 ## 9. Git conventions
 

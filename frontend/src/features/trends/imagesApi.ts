@@ -3,7 +3,7 @@ import { api } from '@/lib/api'
 export interface SnippetImage {
   id: number
   type: 'code_snippet' | 'prompt' | 'manual_upload'
-  status: string
+  status: 'pending' | 'ready' | 'failed'
   spec: { code: string; language: string; title: string } | null
   prompt_text: string | null
   url: string | null
@@ -13,12 +13,24 @@ export interface SnippetImage {
 
 export function fetchPostImages(postId: number): Promise<{
   snippet: SnippetImage | null
+  failedSnippet: SnippetImage | null
+  pendingSnippet: SnippetImage | null
   prompts: SnippetImage[]
   uploads: SnippetImage[]
 }> {
   return api<{ data: SnippetImage[] }>(`/posts/${postId}/images`).then(({ data }) => ({
     snippet:
-      (data.filter((i) => i.type === 'code_snippet').at(-1) as SnippetImage | undefined) ?? null,
+      (data.filter((i) => i.type === 'code_snippet' && i.status === 'ready').at(-1) as
+        | SnippetImage
+        | undefined) ?? null,
+    pendingSnippet:
+      (data.filter((i) => i.type === 'code_snippet' && i.status === 'pending').at(-1) as
+        | SnippetImage
+        | undefined) ?? null,
+    failedSnippet:
+      (data.filter((i) => i.type === 'code_snippet' && i.status === 'failed').at(-1) as
+        | SnippetImage
+        | undefined) ?? null,
     prompts: data.filter((i) => i.type === 'prompt'),
     uploads: data.filter((i) => i.type === 'manual_upload'),
   }))
