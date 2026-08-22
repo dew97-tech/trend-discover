@@ -14,19 +14,45 @@ return [
     'providers' => [
 
         'opencode_go' => [
-            'base_url' => env('OPENCODE_GO_BASE_URL', 'https://api.opencode.go/v1'),
+            // API root — the provider appends /chat/completions. Pasting the
+            // full endpoint also works (defensively normalized).
+            'base_url' => env('OPENCODE_GO_BASE_URL', 'https://opencode.ai/zen/go/v1'),
             'api_key' => env('OPENCODE_GO_API_KEY'),
+
+            // Runtime override from Settings UI lives in system_settings
+            // ('ai.model') and wins over this env default.
             'model' => env('OPENCODE_GO_MODEL', 'ox-alpha-free'),
 
             /*
-            | STRICT allowlist per product decision — the provider refuses to
-            | send requests for any model outside this list. Switch models via
-            | OPENCODE_GO_MODEL only.
+            | STRICT allowlist per product decision — requests for anything
+            | outside these ids are refused. Switch models via Settings.
+            |
+            | Profiles explain HOW each model behaves:
+            |   reasoning        — model streams chain-of-thought into a
+            |                      separate reasoning_content field; needs a
+            |                      large output budget + reasoning_effort control
+            |                      (Hy3: high/medium/low/none — Tencent Hunyuan 3)
+            |   effort           — reasoning_effort sent for reasoning models
+            |   max_output       — safe max_tokens ceiling for this model
             */
             'allowed_models' => [
-                'ox-alpha-free',
-                'hy3',
-                'mimo-v2.5',
+                'ox-alpha-free' => [
+                    'label' => 'Ox Alpha Free',
+                    'reasoning' => false,
+                    'max_output' => 4096,
+                ],
+                'mimo-v2.5-free' => [
+                    'label' => 'MiMo-V2.5 Free',
+                    'reasoning' => true,
+                    'effort' => 'low',
+                    'max_output' => 8192,
+                ],
+                'hy3' => [
+                    'label' => 'Hy3',
+                    'reasoning' => true,
+                    'effort' => 'none',
+                    'max_output' => 16384,
+                ],
             ],
 
             'timeout' => 120,
@@ -38,9 +64,7 @@ return [
     |--------------------------------------------------------------------------
     | Cost control
     |--------------------------------------------------------------------------
-    | Hard ceilings enforced in code; soft targets live in system_settings.
-    | max_tokens must leave room for reasoning models' invisible chain-of-
-    | thought — 2000 caused empty visible content on truncation.
+    | Fallback ceiling when a profile has no max_output.
     */
     'max_tokens_per_call' => 4096,
 ];

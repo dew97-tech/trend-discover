@@ -34,7 +34,9 @@ export function SettingsPage() {
   const [weights, setWeights] = useState<Weights>({})
   const [limits, setLimits] = useState<Record<string, number>>({})
   const [model, setModel] = useState('')
-  const [models, setModels] = useState<Array<{ id: string; on_gateway: boolean }>>([])
+  const [models, setModels] = useState<
+    Array<{ id: string; label: string; reasoning: boolean; on_gateway: boolean }>
+  >([])
   const [sources, setSources] = useState<SourceRow[] | null>(null)
   const [savingWeights, setSavingWeights] = useState(false)
   const [savingLimits, setSavingLimits] = useState(false)
@@ -52,7 +54,9 @@ export function SettingsPage() {
   }, [])
 
   useEffect(() => {
-    api<{ models: Array<{ id: string; on_gateway: boolean }> }>('/settings/models')
+    api<{
+      models: Array<{ id: string; label: string; reasoning: boolean; on_gateway: boolean }>
+    }>('/settings/models')
       .then((d) => setModels(d.models))
       .catch(() => null)
   }, [])
@@ -194,7 +198,10 @@ export function SettingsPage() {
               {models.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   <span className="flex items-center gap-2">
-                    {m.id}
+                    {m.label}
+                    {m.reasoning ? (
+                      <Badge variant="outline" className="px-1 py-0 text-[10px]">reasoning</Badge>
+                    ) : null}
                     {m.on_gateway ? (
                       <Badge variant="secondary" className="px-1 py-0 text-[10px]">live</Badge>
                     ) : null}
@@ -204,7 +211,10 @@ export function SettingsPage() {
             </SelectContent>
           </Select>
           <p className="mt-2 text-xs text-muted-foreground">
-            Allowlisted models only. "live" = confirmed available on the gateway right now.
+            Allowlisted models only. <Badge variant="secondary" className="mx-0.5 px-1 py-0 text-[10px]">live</Badge>
+            = available on the gateway right now ·
+            <Badge variant="outline" className="mx-0.5 px-1 py-0 text-[10px]">reasoning</Badge>
+            = thinks before answering (slower, deeper — budget auto-managed).
           </p>
         </CardContent>
       </Card>

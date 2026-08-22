@@ -42,10 +42,12 @@ class GeneratePostJob implements ShouldBeUnique, ShouldQueue
         JobRunRepositoryInterface $runs,
     ): void {
         $run = $runs->start(static::class);
+        $log = $runs->logger($run);
 
         $trend = Trend::query()->find($this->trendId);
 
         if ($trend === null) {
+            $log->warning('skipped — trend no longer exists');
             $runs->finish($run, JobRun::STATUS_SUCCESS, meta: ['skipped' => 'trend deleted']);
 
             return;
@@ -53,23 +55,40 @@ class GeneratePostJob implements ShouldBeUnique, ShouldQueue
 
         try {
             if (! $this->force && $generation->limitReached($trend)) {
+                $log->error('blocked — generation limit reached for this trend');
                 $runs->finish($run, JobRun::STATUS_FAILED, error: 'Generation limit reached for this trend.');
 
                 return;
             }
 
             if (PostGenerationService::dailyBudgetRemaining() <= 0) {
+                $log->error('blocked — daily AI call budget exhausted');
                 $runs->finish($run, JobRun::STATUS_FAILED, error: 'Daily AI call budget exhausted.');
 
                 return;
             }
 
-            $trend->forceFill(['status' => 'researching'])->save();
+            $log->info('generating post', [
+                'trend' => (string) str($trend->title)->limit(80),
+                'format' => $this->spec->format,
+                'tone' => $this->spec->tone,
+                'angle' => $this->spec->angle,
+                'force' => $this->force,
+            ]);
 
-            ['post' => $post] = $generation->generate($trend, $this->spec, $this->force);
+            $trend->forceFill(['status' => 'researching'])->save();
+            $log->info('researching trend signals…');
+
+            ['post' => $post, 'cached' => $cached] = $generation->generate($trend, $this->spec, $this->force);
+            $log->info($cached ? 'post generated (cached research reused)' : 'post generated', [
+                'post_id' => $post->id,
+                'hook' => (string) str((string) $post->hook)->limit(80),
+            ]);
 
             // Research used for the post is reused as the judge's ground truth.
             ['research' => $research] = app(\App\Services\AI\ResearchService::class)->getOrGenerate($trend);
+
+            $log->info('running quality gate…');
 
             $verdict = $gate->evaluate($post, $research);
 
@@ -84,12 +103,21 @@ class GeneratePostJob implements ShouldBeUnique, ShouldQueue
 
             $trend->forceFill(['status' => 'researched', 'researched_at' => now()])->save();
 
+            $log->info('quality verdict', [
+                'score' => $verdict['total'],
+                'routed_to' => $verdict['status']->value,
+                'rule_violations' => $verdict['breakdown']['rule_violations'] ?? 0,
+                'issues' => count($verdict['issues']),
+            ]);
+
             $runs->finish($run, JobRun::STATUS_SUCCESS, meta: [
                 'post_id' => $post->id,
                 'quality' => $verdict['total'],
                 'routed_to' => $verdict['status']->value,
             ]);
         } catch (\Throwable $e) {
+            $log->error('generation failed', ['error' => $e->getMessage(), 'attempt' => $this->attempts()]);
+
             $trend?->forceFill(['status' => 'researched'])->save();
 
             $runs->finish($run, JobRun::STATUS_FAILED, error: $e->getMessage());

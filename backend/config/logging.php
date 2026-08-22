@@ -131,6 +131,22 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | Pipeline channel
+        |--------------------------------------------------------------------------
+        | Structured, human-readable events for every background job
+        | (collect / detect / score / generate). Each line carries the
+        | job_run id so GET /api/jobs/{id}/log can filter precisely.
+        */
+        'pipeline' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/pipeline.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

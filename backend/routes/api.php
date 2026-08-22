@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::patch('/sources/{source}', [SourceController::class, 'update']);
     Route::post('/sources/{source}/collect-now', [SourceController::class, 'collectNow']);
     Route::get('/jobs', [JobRunController::class, 'index']);
+    Route::get('/jobs/{id}/log', [JobRunController::class, 'log']);
 
     Route::get('/settings', [SettingController::class, 'index']);
     Route::patch('/settings', [SettingController::class, 'update']);

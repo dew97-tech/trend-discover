@@ -40,6 +40,15 @@ const SCORE_TIERS = {
   low: 'bg-surface-muted text-muted-foreground',
 } as const
 
+const SCORE_HELP: Record<string, string> = {
+  Freshness: 'How recently this story surfaced — decays over ~1.5 days per halving.',
+  Momentum: 'Engagement speed (points/comments per hour since first seen).',
+  Relevance: 'Match strength against your technology & category registry.',
+  Usefulness: 'Practical engineering value — heuristics now, AI-judged later.',
+  Novelty: 'How fresh and under-covered the story is. High = not everywhere yet.',
+  Saturation: 'How much this topic is already being discussed across sources.',
+}
+
 export function TrendExplorerPage() {
   const [trends, setTrends] = useState<Trend[]>([])
   const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null)
@@ -118,7 +127,14 @@ export function TrendExplorerPage() {
     setRescoring(true)
 
     rescoreTrend(selected.id)
-      .then(() => toast.success('Re-score queued — refresh in a few seconds.'))
+      .then(() =>
+        toast.success('Re-score queued — watch it run in Pipeline Jobs.', {
+          action: {
+            label: 'View',
+            onClick: () => window.open('/jobs', '_self'),
+          },
+        }),
+      )
       .catch(() => toast.error('Re-score failed.'))
       .finally(() => setRescoring(false))
   }
@@ -267,12 +283,12 @@ export function TrendExplorerPage() {
       )}
 
       <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+        <DialogContent className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden sm:max-w-lg">
           {selected ? (
             <>
-              <DialogHeader>
+              <DialogHeader className="shrink-0">
                 <div className="flex items-start justify-between gap-3">
-                  <DialogTitle className="text-left text-base leading-snug">
+                  <DialogTitle className="min-w-0 text-left text-base leading-snug [overflow-wrap:anywhere]">
                     {selected.title}
                   </DialogTitle>
                   <span
@@ -280,67 +296,89 @@ export function TrendExplorerPage() {
                       'shrink-0 rounded-full px-2.5 py-1 text-sm font-bold tabular-nums',
                       SCORE_TIERS[scoreTier(selected.scores.trend)],
                     )}
+                    title="Composite trend score"
                   >
                     {Math.round(selected.scores.trend)}
                   </span>
                 </div>
                 <DialogDescription className="text-left">
-                  {selected.category?.name ?? 'Uncategorized'} · {selected.item_count} signals ·
-                  first seen{' '}
+                  {selected.category?.name ?? 'Uncategorized'} · {selected.item_count} signal
+                  {selected.item_count === 1 ? '' : 's'} · first seen{' '}
                   {selected.first_seen_at
                     ? new Date(selected.first_seen_at).toLocaleDateString()
                     : '—'}
                 </DialogDescription>
               </DialogHeader>
 
-              {selected.summary ? (
-                <p className="text-sm leading-relaxed text-muted-foreground">{selected.summary}</p>
-              ) : null}
+              {/* Scrollable body — header + actions stay pinned */}
+              <div className="-mx-1 flex-1 space-y-5 overflow-y-auto px-1">
+                {selected.summary ? (
+                  <p className="text-sm leading-relaxed [overflow-wrap:anywhere] text-muted-foreground">
+                    {selected.summary}
+                  </p>
+                ) : null}
 
-              <section className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Score breakdown
-                </h3>
-                {Object.entries({
-                  Freshness: selected.scores.freshness,
-                  Momentum: selected.scores.momentum,
-                  Relevance: selected.scores.relevance,
-                  Usefulness: selected.scores.usefulness,
-                  Novelty: selected.scores.novelty,
-                  Saturation: selected.scores.saturation,
-                }).map(([label, value]) => (
-                  <div key={label} className="flex items-center gap-3">
-                    <span className="w-24 shrink-0 text-xs text-muted-foreground">{label}</span>
-                    <Progress value={value} className="h-2 flex-1" />
-                    <span className="w-9 text-right text-xs tabular-nums">{Math.round(value)}</span>
-                  </div>
-                ))}
-              </section>
-
-              {selected.sources.length > 0 ? (
                 <section className="space-y-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Detected signals
+                    Score breakdown
                   </h3>
-                  <ul className="space-y-1.5">
-                    {selected.sources.slice(0, 8).map((source, i) => (
-                      <li key={i} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="truncate text-muted-foreground">
-                          <Badge variant="outline" className="mr-1.5 px-1 py-0 text-[10px]">
-                            {source.source ?? '?'}
-                          </Badge>
-                          {source.title ?? '(untitled)'}
-                        </span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">
-                          {source.metrics.points ?? source.metrics.stars ?? source.metrics.score ?? source.metrics.reactions ?? '—'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  {Object.entries({
+                    Freshness: selected.scores.freshness,
+                    Momentum: selected.scores.momentum,
+                    Relevance: selected.scores.relevance,
+                    Usefulness: selected.scores.usefulness,
+                    Novelty: selected.scores.novelty,
+                    Saturation: selected.scores.saturation,
+                  }).map(([label, value]) => (
+                    <div key={label} className="flex min-w-0 items-center gap-3">
+                      <span
+                        className="w-24 shrink-0 cursor-help text-xs text-muted-foreground underline decoration-dotted decoration-border underline-offset-2"
+                        title={SCORE_HELP[label]}
+                      >
+                        {label}
+                      </span>
+                      <Progress value={value} className="h-2 min-w-0 flex-1" />
+                      <span className="w-9 shrink-0 text-right text-xs tabular-nums">
+                        {Math.round(value)}
+                      </span>
+                    </div>
+                  ))}
                 </section>
-              ) : null}
 
-              <div className="flex justify-end gap-2">
+                {selected.sources.length > 0 ? (
+                  <section className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Detected signals
+                    </h3>
+                    <ul className="space-y-1.5">
+                      {selected.sources.slice(0, 8).map((source, i) => (
+                        <li key={i} className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                          <span className="flex min-w-0 items-center truncate text-muted-foreground">
+                            <Badge variant="outline" className="mr-1.5 shrink-0 px-1 py-0 text-[10px]">
+                              {source.source ?? '?'}
+                            </Badge>
+                            <span
+                              className="cursor-help truncate [overflow-wrap:anywhere]"
+                              title={source.url ?? source.title ?? undefined}
+                            >
+                              {source.title ?? '(untitled)'}
+                            </span>
+                          </span>
+                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                            {source.metrics.points ??
+                              source.metrics.stars ??
+                              source.metrics.score ??
+                              source.metrics.reactions ??
+                              '—'}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+              </div>
+
+              <div className="flex shrink-0 justify-end gap-2 border-t pt-3">
                 <Button variant="outline" size="sm" onClick={handleRescore} disabled={rescoring}>
                   <RefreshCw className={cn('size-3.5', rescoring && 'animate-spin')} />
                   Re-score

@@ -10,7 +10,7 @@ class JobRunRepository implements JobRunRepositoryInterface
 {
     public function start(string $jobClass, ?string $jobId = null, ?string $batchId = null): JobRun
     {
-        return JobRun::query()->create([
+        $run = JobRun::query()->create([
             'job_class' => $jobClass,
             'job_id' => $jobId,
             'batch_id' => $batchId,
@@ -18,6 +18,18 @@ class JobRunRepository implements JobRunRepositoryInterface
             'attempts' => 1,
             'started_at' => now(),
         ]);
+
+        $this->logger($run)->info('started');
+
+        return $run;
+    }
+
+    public function logger(JobRun $run): \App\Support\RunLogger
+    {
+        return new \App\Support\RunLogger(
+            runId: $run->id,
+            job: class_basename($run->job_class),
+        );
     }
 
     public function finish(JobRun $run, string $status, ?string $error = null, array $meta = []): JobRun
@@ -29,6 +41,14 @@ class JobRunRepository implements JobRunRepositoryInterface
             'error' => $error,
             'meta' => $meta ?: $run->meta,
         ])->save();
+
+        $logger = $this->logger($run);
+
+        if ($status === JobRun::STATUS_FAILED) {
+            $logger->error('failed', ['error' => $error, 'meta' => $meta ?: null]);
+        } else {
+            $logger->info('finished', ['status' => $status] + ($meta ?: []));
+        }
 
         return $run;
     }

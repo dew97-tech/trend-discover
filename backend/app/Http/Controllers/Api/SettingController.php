@@ -37,7 +37,7 @@ class SettingController extends Controller
             'limits.max_image_prompts_per_post' => ['sometimes', 'integer', 'between:0,5'],
             'limits.daily_ai_call_budget' => ['sometimes', 'integer', 'between:1,5000'],
             'model' => ['sometimes', 'string', \Illuminate\Validation\Rule::in(
-                config('ai.providers.opencode_go.allowed_models'),
+                array_keys(config('ai.providers.opencode_go.allowed_models', [])),
             )],
         ]);
 
@@ -78,12 +78,12 @@ class SettingController extends Controller
     }
 
     /**
-     * Live model catalogue from the gateway, intersected with our strict
-     * allowlist. Falls back to the static allowlist when unreachable.
+     * Model catalogue with capability profiles, intersected with the gateway's
+     * live /models listing. Falls back gracefully when unreachable.
      */
     public function models(): JsonResponse
     {
-        $allowed = config('ai.providers.opencode_go.allowed_models');
+        $profiles = config('ai.providers.opencode_go.allowed_models', []);
 
         try {
             $response = Http::baseUrl($this->apiRoot())
@@ -100,10 +100,12 @@ class SettingController extends Controller
         }
 
         return response()->json([
-            'models' => collect($allowed)->map(fn (string $id) => [
+            'models' => collect($profiles)->map(fn (array $profile, string $id) => [
                 'id' => $id,
+                'label' => $profile['label'] ?? $id,
+                'reasoning' => (bool) ($profile['reasoning'] ?? false),
                 'on_gateway' => in_array($id, $gatewayIds, true),
-            ])->all(),
+            ])->values()->all(),
             'active' => SystemSetting::get('ai.model', config('ai.providers.opencode_go.model')),
             'gateway_reachable' => $gatewayIds !== [],
         ]);

@@ -102,9 +102,22 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 - `OPENCODE_GO_BASE_URL` = **API root** (e.g. `https://opencode.ai/zen/go/v1`).
   The provider appends `/chat/completions`; pasting the full endpoint also works
   (defensively normalized in `OpenCodeGoProvider::apiRoot()`).
-- Reasoning models may return EMPTY visible content when truncated at
-  `max_tokens` — ceiling is 4096 and the provider silently re-attempts once.
 - Model output is decoded defensively: direct JSON → markdown-fenced → brace-extracted.
+- **Reasoning models** (hy3, mimo-v2.5) stream chain-of-thought into a separate
+  `reasoning_content` field. If `max_tokens` is exhausted by thinking, `content`
+  arrives EMPTY with `finish_reason=length`. Counters, in order
+  (`OpenCodeGoProvider::completeWithEscalation`):
+    1. Per-model `reasoning_effort` from its profile (hy3 → `none` = direct answers)
+    2. On empty+length: lower effort one step, then double max_tokens (up to ×4)
+    3. Truthful error after ladder exhaustion — never a generic "empty content"
+- Profiles live in `config/ai.php`; model switchable at runtime via Settings.
+
+## 8c. Pipeline logging
+
+- Channel `pipeline` (daily file, 14-day retain): every job logs structured events
+  tagged `[JobName run={id}]` — start/finish/verdicts/failures included.
+- `GET /api/jobs/{id}/log` returns that run's lines; the Pipeline Jobs screen
+  expands rows to show them inline. Re-score toasts link straight to the screen.
 
 ## 9. Git conventions
 
