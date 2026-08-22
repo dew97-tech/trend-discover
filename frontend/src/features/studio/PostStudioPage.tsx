@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { fetchPosts, type ContentPost } from '../trends/api'
+import { clearPendingGeneration, fetchPosts, getPendingGenerations, type ContentPost } from '../trends/api'
 import { cn } from '@/lib/utils'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -23,7 +23,18 @@ export function PostStudioPage() {
 
   const load = useCallback(() => {
     fetchPosts()
-      .then((res) => setPosts(res.data))
+      .then((res) => {
+        setPosts(res.data)
+
+        // A tracked generation just landed → celebrate + stop watching it.
+        const pending = getPendingGenerations()
+        for (const entry of pending) {
+          if (res.data.some((p) => p.trend_id === entry.trendId)) {
+            clearPendingGeneration(entry.trendId)
+            toast.success('Your generated post is ready.')
+          }
+        }
+      })
       .catch(() => {
         setPosts([])
         toast.error('Failed to load posts.')
@@ -32,12 +43,22 @@ export function PostStudioPage() {
 
   useEffect(() => {
     load()
-    // Poll briefly after mount in case a generation is still in flight.
-    const timer = setInterval(load, 5000)
-    const stop = setTimeout(() => clearInterval(timer), 30000)
+
+    // Poll every 5s while a queued generation is still in flight
+    // (real AI runs take 1.5–3+ minutes — far beyond the old 30s window).
+    const timer = setInterval(() => {
+      if (!document.hidden && getPendingGenerations().length > 0) load()
+    }, 5000)
+
+    // Instant refresh when the user returns to the tab.
+    const onVisible = () => {
+      if (!document.hidden) load()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
     return () => {
       clearInterval(timer)
-      clearTimeout(stop)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [load])
 

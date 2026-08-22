@@ -19,11 +19,13 @@ class GeneratePostJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 2;
+    // 3 attempts across ~4 minutes: rides out transient gateway incidents
+    // (free-tier models occasionally return 500s for minutes at a time).
+    public int $tries = 3;
 
-    public array $backoff = [30];
+    public array $backoff = [60, 180];
 
-    public int $timeout = 300;
+    public int $timeout = 600;
 
     public function uniqueId(): string
     {

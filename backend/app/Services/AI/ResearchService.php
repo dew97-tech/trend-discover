@@ -47,10 +47,18 @@ class ResearchService
             'signals' => $signals,
         ]);
 
-        $response = $this->manager->provider()->complete(
-            $this->prompts->get('research.system'),
-            $prompt,
-        );
+        $started = now()->getTimestampMs();
+
+        try {
+            $response = $this->manager->provider()->complete(
+                $this->prompts->get('research.system'),
+                $prompt,
+            );
+        } catch (\Throwable $e) {
+            $this->logFailure($this->manager, 'research', $requestHash, $e, trendId: $trend->id, durationMs: max(0, now()->getTimestampMs() - $started));
+
+            throw $e;
+        }
 
         $generation = $this->logGeneration(
             provider: class_basename($this->manager->provider()),

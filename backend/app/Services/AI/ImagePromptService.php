@@ -49,10 +49,18 @@ class ImagePromptService
             'key_points' => $research['key_points'] ?? [],
         ]);
 
-        $response = $this->manager->provider()->complete(
-            $this->prompts->get('image_prompt.system'),
-            $prompt,
-        );
+        $started = now()->getTimestampMs();
+
+        try {
+            $response = $this->manager->provider()->complete(
+                $this->prompts->get('image_prompt.system'),
+                $prompt,
+            );
+        } catch (\Throwable $e) {
+            $this->logFailure($this->manager, 'image_prompt', hash('sha256', 'image_prompt|'.$post->id), $e, postId: $post->id, durationMs: max(0, now()->getTimestampMs() - $started));
+
+            throw $e;
+        }
 
         $data = $response->data;
 

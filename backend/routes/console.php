@@ -19,3 +19,6 @@ Schedule::command('trends:collect lobsters')->cron('10 */3 * * *')->withoutOverl
 
 // Nightly full re-score keeps decayed scores honest.
 Schedule::command('trends:score')->dailyAt('02:00');
+
+// Lying "running" rows (worker killed mid-job) break monitoring trust.
+Schedule::command('jobs:reconcile-stale')->everyFifteenMinutes();

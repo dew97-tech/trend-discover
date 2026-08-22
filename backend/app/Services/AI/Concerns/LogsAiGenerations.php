@@ -43,4 +43,38 @@ trait LogsAiGenerations
             ->latest('id')
             ->first();
     }
+
+    /**
+     * Failure rows make gateway incidents forensically visible — without
+     * them, ai_generations only ever shows successes.
+     */
+    protected function logFailure(
+        AIManager $manager,
+        string $kind,
+        string $requestHash,
+        \Throwable $e,
+        ?int $trendId = null,
+        ?int $postId = null,
+        int $durationMs = 0,
+    ): void {
+        try {
+            AiGeneration::query()->create([
+                'provider' => class_basename($manager->provider()),
+                'kind' => $kind,
+                'idempotency_key' => hash('sha256', "failed|{$kind}|".uniqid()),
+                'subject_type' => $postId !== null ? 'content_post' : ($trendId !== null ? 'trend' : null),
+                'subject_id' => $postId ?? $trendId,
+                'model' => (string) (
+                    \App\Models\SystemSetting::get('ai.model')
+                    ?? config('ai.providers.opencode_go.model')
+                ),
+                'duration_ms' => max(0, $durationMs),
+                'status' => 'failed',
+                'error' => str($e->getMessage())->limit(500),
+                'request_hash' => $requestHash,
+            ]);
+        } catch (\Throwable) {
+            // Never let forensic logging break the actual error flow.
+        }
+    }
 }

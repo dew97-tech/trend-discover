@@ -116,6 +116,15 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
   for the general tier — those 401 on the Go endpoint). Trust only the
   `on_gateway` flag from `GET /api/settings/models`; unavailable models are
   disabled in the Settings picker and can't be selected.
+- **Cheapest-first fallback** (`OpenCodeGoProvider::complete`): gateway 5xx /
+  unsupported-model errors walk `fallback_order` from `config/ai.php`
+  (ox-alpha-free → mimo-v2.5 → hy3); empty-content reasoning burn escalates
+  budget once on-model before switching. Every transition lands in the
+  pipeline log; `scripts/verify-ai-fallback.php` replays a simulated outage.
+- Failed AI calls are recorded in `ai_generations` with `status=failed`
+  (+ model, duration, error) — check there when generations misbehave.
+- Stale "running" job rows self-heal: `jobs:reconcile-stale` runs every
+  15 minutes and marks anything stuck >2h as failed.
 
 ## 8c. Pipeline logging
 

@@ -81,6 +81,7 @@ export interface GenerateSpec {
 
 export interface ContentPost {
   id: number
+  trend_id: number
   trend?: { id: number; title: string } | null
   title: string | null
   hook: string | null
@@ -99,7 +100,40 @@ export interface ContentPost {
 }
 
 export function generatePost(trendId: number, spec: GenerateSpec): Promise<{ message: string }> {
-  return api(`/trends/${trendId}/generate`, { method: 'POST', body: spec })
+  return api<{ message: string }>(`/trends/${trendId}/generate`, { method: 'POST', body: spec }).then((res) => {
+    // Track so Studio keeps polling until the post actually lands
+    // (real AI runs take 1.5–3+ minutes).
+    try {
+      const rest = getPendingGenerations().filter((e) => e.trendId !== trendId)
+      localStorage.setItem(
+        'td_pending_generations',
+        JSON.stringify([...rest, { trendId, queuedAt: Date.now() }]),
+      )
+    } catch {
+      // tracker is best-effort UX sugar — never block the queue call
+    }
+    return res
+  })
+}
+
+export function getPendingGenerations(): Array<{ trendId: number; queuedAt: number }> {
+  try {
+    return (
+      JSON.parse(localStorage.getItem('td_pending_generations') ?? '[]') as Array<{
+        trendId: number
+        queuedAt: number
+      }>
+    ).filter((e) => typeof e.trendId === 'number' && Date.now() - e.queuedAt < 10 * 60 * 1000)
+  } catch {
+    return []
+  }
+}
+
+export function clearPendingGeneration(trendId: number): void {
+  localStorage.setItem(
+    'td_pending_generations',
+    JSON.stringify(getPendingGenerations().filter((e) => e.trendId !== trendId)),
+  )
 }
 
 export interface ContentPostFilters {

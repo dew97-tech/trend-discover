@@ -151,6 +151,8 @@ class QualityGateService
 
             return $response->data;
         } catch (\Throwable $e) {
+            $this->logFailure($this->manager, 'quality', hash('sha256', substr($post->body, 0, 2000)), $e, postId: $post->id);
+
             // Never block the pipeline on judge failure — conservative neutral score.
             report($e);
 

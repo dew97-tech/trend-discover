@@ -11,6 +11,7 @@ class PostResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'trend_id' => $this->trend_id,
             'trend' => $this->whenLoaded('trend', fn () => $this->trend?->only(['id', 'title'])),
             'title' => $this->title,
             'hook' => $this->hook,

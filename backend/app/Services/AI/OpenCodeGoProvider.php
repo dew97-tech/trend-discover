@@ -9,12 +9,13 @@ use Illuminate\Support\Facades\Log;
 /**
  * OpenAI-compatible chat-completions client for the OpenCode Go gateway.
  *
- * Model is hard-restricted to the configured allowlist (product decision),
- * and each model carries a capability profile:
- *   - reasoning models stream chain-of-thought into reasoning_content;
- *     if max_tokens is exhausted by thinking, `content` comes back EMPTY
- *     with finish_reason=length. We counter that with an escalation
- *     ladder: lower reasoning effort, then double the budget.
+ * Two layers of resilience:
+ *   1. WITHIN a model: hybrid-thinking models can burn the token budget on
+ *      invisible reasoning (finish_reason=length, empty content) — escalate
+ *      reasoning effort / double the budget once.
+ *   2. ACROSS models: gateway 5xx or unsupported-model errors switch to the
+ *      next cheapest model in the configured fallback chain (product rule:
+ *      "if alpha errors, move on to the next cheapest").
  */
 final class OpenCodeGoProvider implements AIProvider
 {
@@ -23,128 +24,161 @@ final class OpenCodeGoProvider implements AIProvider
         $config = config('ai.providers.opencode_go');
 
         // Settings UI override wins over .env so models are swappable at runtime.
-        $model = (string) (
+        $active = (string) (
             \App\Models\SystemSetting::get('ai.model')
             ?? $config['model']
         );
 
-        $profile = $config['allowed_models'][$model]
-            ?? throw new \RuntimeException(
-                "Model [$model] is not in the approved allowlist. Allowed: ".
-                implode(', ', array_keys($config['allowed_models'])),
+        $profiles = $config['allowed_models'];
+
+        if (! isset($profiles[$active])) {
+            throw new \RuntimeException(
+                "Model [$active] is not in the approved allowlist. Allowed: ".
+                implode(', ', array_keys($profiles)),
             );
+        }
+
+        // Candidate chain: active first, then remaining models in cost order.
+        $chain = [$active];
+        foreach (($config['fallback_order'] ?? []) as $candidate) {
+            if ($candidate !== $active && isset($profiles[$candidate])) {
+                $chain[] = $candidate;
+            }
+        }
 
         $started = now()->getTimestampMs();
+        $tried = [];
+        $lastError = null;
 
-        [$response, $rawContent] = $this->completeWithEscalation($model, $profile, $systemPrompt, $userPrompt);
+        foreach ($chain as $model) {
+            try {
+                [$response, $rawContent] = $this->completeOnModel(
+                    $model,
+                    $profiles[$model],
+                    $systemPrompt,
+                    $userPrompt,
+                );
+            } catch (ConnectionException $e) {
+                Log::channel('pipeline')->warning("[OpenCodeGoProvider] {$model} failed — trying next in chain", [
+                    'error' => str($e->getMessage())->limit(160),
+                ]);
 
-        $durationMs = max(0, now()->getTimestampMs() - $started);
+                $tried[] = $model.': '.str($e->getMessage())->limit(80);
+                $lastError = $e;
 
-        if ($response->failed()) {
-            Log::warning('OpenCode Go request failed', ['status' => $response->status(), 'model' => $model]);
+                continue;
+            }
 
-            throw new ConnectionException(
-                "OpenCode Go request failed: {$response->status()} ".str($response->body())->limit(160),
+            if ($response->failed()) {
+                Log::channel('pipeline')->warning("[OpenCodeGoProvider] {$model} failed — trying next in chain", [
+                    'status' => $response->status(),
+                ]);
+
+                $tried[] = "{$model}: HTTP {$response->status()}";
+                $lastError = new ConnectionException(
+                    "OpenCode Go request failed on {$model}: {$response->status()} ".
+                    str($response->body())->limit(120),
+                );
+
+                continue;
+            }
+
+            if (trim($rawContent) === '') {
+                Log::channel('pipeline')->warning("[OpenCodeGoProvider] {$model} returned empty content after escalation", []);
+
+                $tried[] = "{$model}: empty content (reasoning exhausted budget)";
+                $lastError = new ConnectionException(
+                    "Model [{$model}] spent its entire token budget on reasoning without output.",
+                );
+
+                continue;
+            }
+
+            if ($tried !== []) {
+                Log::channel('pipeline')->info('[OpenCodeGoProvider] succeeded via fallback', [
+                    'model' => $model,
+                    'earlier_failures' => $tried,
+                ]);
+            }
+
+            $payload = $response->json();
+
+            return new AiResponse(
+                data: $this->decodeJson($rawContent),
+                durationMs: max(0, now()->getTimestampMs() - $started),
+                tokensIn: $payload['usage']['prompt_tokens'] ?? null,
+                tokensOut: $payload['usage']['completion_tokens'] ?? null,
+                model: $model,
             );
         }
 
-        if (trim($rawContent) === '') {
-            // Escalation exhausted and still nothing visible.
-            throw new \RuntimeException(
-                "Model [{$model}] spent its entire token budget on reasoning without ".
-                'producing output (finish_reason=length). Escalated retries exhausted — '.
-                'consider switching to a non-reasoning model for this task.',
-            );
-        }
-
-        $payload = $response->json();
-
-        $content = $this->decodeJson($rawContent);
-
-        return new AiResponse(
-            data: $content,
-            durationMs: $durationMs,
-            tokensIn: $payload['usage']['prompt_tokens'] ?? null,
-            tokensOut: $payload['usage']['completion_tokens'] ?? null,
-            model: $model,
+        throw new \RuntimeException(
+            'All allowlisted models failed. Attempts: '.implode(' | ', $tried).
+            '. Last error: '.($lastError?->getMessage() ?? 'unknown'),
         );
     }
 
     /**
-     * Documented pattern for hybrid-thinking models (Tencent Hunyuan 3 et al):
-     * when finish_reason=length && content empty, lower reasoning_effort one
-     * step and/or double the output budget rather than retrying identically.
+     * Single-model attempt with reasoning-aware escalation:
+     * hybrid-thinking models that exhaust max_tokens on invisible reasoning
+     * get ONE retry with the output budget doubled.
      *
      * @return array{0: \Illuminate\Http\Client\Response, 1: string}
      */
-    private function completeWithEscalation(
+    private function completeOnModel(
         string $model,
         array $profile,
         string $systemPrompt,
         string $userPrompt,
     ): array {
         $reasoning = (bool) ($profile['reasoning'] ?? false);
-        $efforts = ['none', 'low', 'medium', 'high'];
-        $effort = (string) ($profile['effort'] ?? ($reasoning ? 'low' : 'none'));
         $maxTokens = (int) ($profile['max_output'] ?? config('ai.max_tokens_per_call', 4096));
 
-        $response = null;
-        $rawContent = '';
-        $finishReason = null;
+        $body = [
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+            'temperature' => 0.7,
+            'response_format' => ['type' => 'json_object'],
+            'max_tokens' => $maxTokens,
+        ];
 
-        for ($attempt = 1; $attempt <= 3; $attempt++) {
-            $body = [
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userPrompt],
-                ],
-                'temperature' => 0.7,
-                'response_format' => ['type' => 'json_object'],
-                'max_tokens' => $maxTokens,
-            ];
+        if ($reasoning) {
+            // OpenAI-standard control recognized by Hy3/MiMo serving stacks.
+            $body['reasoning_effort'] = (string) ($profile['effort'] ?? 'low');
+        }
 
-            if ($reasoning) {
-                // OpenAI-standard control recognized by Hy3 serving stacks.
-                $body['reasoning_effort'] = $effort;
-            }
+        $response = Http::baseUrl($this->apiRoot())
+            ->timeout((int) config('ai.providers.opencode_go.timeout'))
+            ->withToken((string) config('ai.providers.opencode_go.api_key'))
+            ->retry(
+                (int) config('ai.providers.opencode_go.max_retries'),
+                1000,
+                throw: false,
+                when: fn ($exception, $request) => $exception !== null
+                    || in_array($request?->status() ?? 0, [429, 500, 502, 503, 504], true),
+            )
+            ->post('/chat/completions', $body);
+
+        $rawContent = (string) ($response->json('choices.0.message.content') ?? '');
+
+        // Escalation: budget doubled once when reasoning ate everything.
+        if (! $response->failed() && trim($rawContent) === '' && $response->json('choices.0.finish_reason') === 'length') {
+            Log::channel('pipeline')->warning("[OpenCodeGoProvider] {$model} empty content — doubling budget", [
+                'from_tokens' => $maxTokens,
+                'to_tokens' => $maxTokens * 2,
+            ]);
+
+            $body['max_tokens'] = $maxTokens * 2;
 
             $response = Http::baseUrl($this->apiRoot())
                 ->timeout((int) config('ai.providers.opencode_go.timeout'))
                 ->withToken((string) config('ai.providers.opencode_go.api_key'))
-                ->retry(
-                    (int) config('ai.providers.opencode_go.max_retries'),
-                    1000,
-                    throw: false,
-                    when: fn ($exception, $request) => $exception !== null
-                        || in_array($request?->status() ?? 0, [429, 500, 502, 503, 504], true),
-                )
                 ->post('/chat/completions', $body);
 
-            if ($response->failed()) {
-                break; // HTTP failure — handled upstream, no escalation helps.
-            }
-
             $rawContent = (string) ($response->json('choices.0.message.content') ?? '');
-            $finishReason = (string) ($response->json('choices.0.finish_reason') ?? '');
-
-            if (trim($rawContent) !== '') {
-                break;
-            }
-
-            Log::warning('OpenCode Go empty content — escalating', [
-                'model' => $model,
-                'attempt' => $attempt,
-                'finish_reason' => $finishReason,
-                'next_max_tokens' => $maxTokens * 2,
-            ]);
-
-            // Ladder step: reduce thinking depth, then grow the budget.
-            if ($reasoning && in_array($effort, ['high', 'medium'])) {
-                $effort = $effort === 'high' ? 'low' : 'none';
-            } else {
-                $maxTokens *= 2;
-            }
         }
 
         return [$response, $rawContent];
@@ -152,7 +186,6 @@ final class OpenCodeGoProvider implements AIProvider
 
     /**
      * Users may paste either the API root or the full endpoint.
-     * Accept both — strip a trailing /chat/completions plus slashes.
      */
     private function apiRoot(): string
     {
@@ -167,7 +200,6 @@ final class OpenCodeGoProvider implements AIProvider
 
     /**
      * Models often wrap JSON in markdown fences or prepend prose.
-     * Decode defensively: direct → fenced → brace-extracted.
      */
     private function decodeJson(string $raw): array
     {

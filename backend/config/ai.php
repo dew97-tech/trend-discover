@@ -60,6 +60,17 @@ return [
 
             'timeout' => 120,
             'max_retries' => 2,
+
+            /*
+            | Cost-ordered fallback chain (per OpenCode Go pricing):
+            | when the active model fails with gateway errors (5xx/unsupported),
+            | requests walk this order — cheapest first — until one answers.
+            */
+            'fallback_order' => [
+                'ox-alpha-free',
+                'mimo-v2.5',
+                'hy3',
+            ],
         ],
     ],
 

@@ -41,10 +41,18 @@ class SnippetService
             'post_body' => str($post->body)->limit(3000),
         ]);
 
-        $response = $this->manager->provider()->complete(
-            $this->prompts->get('snippet.system'),
-            $prompt,
-        );
+        $started = now()->getTimestampMs();
+
+        try {
+            $response = $this->manager->provider()->complete(
+                $this->prompts->get('snippet.system'),
+                $prompt,
+            );
+        } catch (\Throwable $e) {
+            $this->logFailure($this->manager, 'snippet', $requestHash, $e, postId: $post->id, durationMs: max(0, now()->getTimestampMs() - $started));
+
+            throw $e;
+        }
 
         $data = $response->data;
 

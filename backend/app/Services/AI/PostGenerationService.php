@@ -63,10 +63,18 @@ class PostGenerationService
             'research_confidence' => $research['confidence'] ?? 'medium',
         ]);
 
-        $response = $this->manager->provider()->complete(
-            $this->prompts->render('post.system'),
-            $prompt,
-        );
+        $started = now()->getTimestampMs();
+
+        try {
+            $response = $this->manager->provider()->complete(
+                $this->prompts->render('post.system'),
+                $prompt,
+            );
+        } catch (\Throwable $e) {
+            $this->logFailure($this->manager, 'post', $requestHash, $e, trendId: $trend->id, durationMs: max(0, now()->getTimestampMs() - $started));
+
+            throw $e;
+        }
 
         $data = $response->data;
 
