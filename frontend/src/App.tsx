@@ -11,6 +11,8 @@ import { TrendExplorerPage } from '@/features/trends/TrendExplorerPage'
 import { PostStudioPage } from '@/features/studio/PostStudioPage'
 import { PostEditorPage } from '@/features/studio/PostEditorPage'
 import { LibraryPage } from '@/features/library/LibraryPage'
+import { JobsPage } from '@/features/jobs/JobsPage'
+import { SettingsPage } from '@/features/settings/SettingsPage'
 
 export default function App() {
   return (
@@ -27,6 +29,8 @@ export default function App() {
                 <Route path="/studio" element={<PostStudioPage />} />
                 <Route path="/studio/:id" element={<PostEditorPage />} />
                 <Route path="/library" element={<LibraryPage />} />
+                <Route path="/jobs" element={<JobsPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route
                   path="*"
                   element={

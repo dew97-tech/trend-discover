@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ContentImageController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\JobRunController;
 use App\Http\Controllers\Api\PostController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SourceController;
 use App\Http\Controllers\Api\TrendController;
 use Illuminate\Http\JsonResponse;
@@ -30,8 +31,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/sources', [SourceController::class, 'index']);
+    Route::patch('/sources/{source}', [SourceController::class, 'update']);
     Route::post('/sources/{source}/collect-now', [SourceController::class, 'collectNow']);
     Route::get('/jobs', [JobRunController::class, 'index']);
+
+    Route::get('/settings', [SettingController::class, 'index']);
+    Route::patch('/settings', [SettingController::class, 'update']);
+    Route::get('/settings/models', [SettingController::class, 'models']);
 
     Route::get('/taxonomy', [TrendController::class, 'taxonomy']);
     Route::get('/trends', [TrendController::class, 'index']);

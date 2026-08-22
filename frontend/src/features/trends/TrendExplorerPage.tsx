@@ -108,7 +108,9 @@ export function TrendExplorerPage() {
 
   function openDetail(trend: Trend) {
     setSelected(null)
-    fetchTrend(trend.id).then(setSelected).catch(() => toast.error('Could not load trend details.'))
+    fetchTrend(trend.id)
+      .then(setSelected)
+      .catch(() => toast.error('Could not load trend details.'))
   }
 
   function handleRescore() {

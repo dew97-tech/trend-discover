@@ -24,6 +24,20 @@ class SourceController extends Controller
         );
     }
 
+    public function update(Request $request, Source $source): JsonResponse
+    {
+        $validated = $request->validate([
+            'is_enabled' => ['required', 'boolean'],
+        ]);
+
+        $source->forceFill(['is_enabled' => $validated['is_enabled']])->save();
+
+        return response()->json([
+            'message' => "Source [{$source->name}] ".($validated['is_enabled'] ? 'enabled' : 'disabled').'.',
+            'data' => new SourceResource($source->loadCount('items')),
+        ]);
+    }
+
     public function collectNow(Request $request, Source $source): JsonResponse
     {
         if (! $source->is_enabled) {

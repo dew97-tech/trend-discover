@@ -43,7 +43,11 @@ export interface TrendDetail extends Trend {
 }
 
 export function fetchTrend(id: number): Promise<TrendDetail> {
-  return api<TrendDetail>(`/trends/${id}`)
+  // Detail responses arrive as {data:{…}, score_breakdown, sources, …} —
+  // flatten once so consumers read scores/sources off one level.
+  return api<TrendDetail & { data: Trend }>(`/trends/${id}`).then(
+    (res) => ({ ...res, ...res.data }),
+  )
 }
 
 export function rescoreTrend(id: number): Promise<{ message: string }> {

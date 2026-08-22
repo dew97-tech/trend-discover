@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Radar, PenSquare, Library, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Radar, PenSquare, Library, Activity, Settings, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -18,6 +18,7 @@ const navigation = [
   { to: '/trends', label: 'Trend Explorer', icon: Radar },
   { to: '/studio', label: 'Post Studio', icon: PenSquare },
   { to: '/library', label: 'Library', icon: Library },
+  { to: '/jobs', label: 'Pipeline Jobs', icon: Activity },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

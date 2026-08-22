@@ -15,7 +15,12 @@ final class OpenCodeGoProvider implements AIProvider
     public function complete(string $systemPrompt, string $userPrompt): AiResponse
     {
         $config = config('ai.providers.opencode_go');
-        $model = (string) $config['model'];
+
+        // Settings UI override wins over .env so models are swappable at runtime.
+        $model = (string) (
+            \App\Models\SystemSetting::get('ai.model')
+            ?? $config['model']
+        );
 
         if (! in_array($model, $config['allowed_models'], true)) {
             throw new \RuntimeException(
