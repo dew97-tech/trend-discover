@@ -98,4 +98,69 @@ return [
     | Fallback ceiling when a profile has no max_output.
     */
     'max_tokens_per_call' => 4096,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Automatic model discovery ("free" fallbacks that never expire)
+    |--------------------------------------------------------------------------
+    | The Go gateway's model roster changes without notice (ids are added and
+    | removed). `php artisan ai:refresh-models` (scheduled daily) fetches the
+    | live roster, ranks candidates cheap/fast-first with the heuristics below,
+    | probes the top N, and persists the best 3 working ids in
+    | system_settings('ai.auto_models'). The provider appends them to the
+    | fallback chain, so dead allowlist models self-heal.
+    |
+    | NOTE: OpenCode's general-tier free models (big-pickle, *-free) are
+    | API-blocked ("free tier can only be used in OpenCode") — discovery only
+    | ever calls the Go endpoint (/zen/go/v1), which is covered by the Go
+    | subscription and reports cost 0.
+    */
+    'auto_discover' => [
+        'enabled' => (bool) env('OPENCODE_AUTO_DISCOVER', true),
+        'probe_candidates' => 10,
+        'keep' => 3,
+
+        // Base quality floor per family prefix (ids are matched after
+        // stripping digits, e.g. "qwen3.8-max" -> "qwen"). Lightweight, fast
+        // families are preferred per product decision.
+        'family_weights' => [
+            'glm' => 30,
+            'deepseek' => 30,
+            'qwen' => 28,
+            'minimax' => 26,
+            'mimo' => 26,
+            'kimi' => 25,
+            'longcat' => 24,
+            'hy' => 22,
+            'omen' => 20,
+            'muse' => 18,
+            'gpt' => 32,
+            'grok' => 32,
+            'gemini' => 32,
+            'claude' => 34,
+        ],
+
+        // Lightweight/fast variants are preferred over heavy ones.
+        'variant_bonus' => [
+            'lightning' => 6,
+            'flash' => 6,
+            'lite' => 5,
+            'nano' => 4,
+            'mini' => 4,
+            'plus' => 3,
+            'code' => 2,
+            'pro' => 0,
+            'max' => 0,
+            'preview' => -2,
+            'beta' => -2,
+            'vision' => -8,
+            'omni' => -8,
+        ],
+
+        // Non-text / experimental / training-data ids are never used.
+        'exclude_patterns' => [
+            'contributor', 'embed', 'tts', 'whisper', 'image', 'audio', 'realtime',
+            'vision', 'omni', 'exp',
+        ],
+    ],
 ];

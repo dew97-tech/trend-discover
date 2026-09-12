@@ -72,7 +72,7 @@ collection is therefore **idempotent** — verified live: second run fetched 100
 | lobsters | score ≥15, last 72h, `/newest.json` ×2 pages | none |
 | dev-to | tags incl. laravel, php, react, nextjs, sql, mysql, database; reactions ≥5, last 7 days (public API ignores sort-by-popularity — see note) | none |
 | engineering-rss | Laravel News, Laravel Daily, Laracasts, Next.js Blog, React Blog, Vercel, Percona MySQL, PlanetScale, InfoQ, Smashing; 25 items/feed | none |
-| youtube | KodeKloud + Laravel Daily channel RSS; 15 videos/feed. `media:statistics` views → metrics (engagement counts views ÷ 200) | none |
+| youtube | 6 channel feeds — KodeKloud, Laravel Daily, Learn with Sumit, Web Dev Cody, ByteByteGo, CodeWithHarry; 15 videos/feed. `media:statistics` views → metrics (engagement counts views ÷ 200) | none |
 
 > Focus sources were chosen to feed the Laravel/PHP/TS/React/Next.js/database
 > hack-content pipeline. YouTube channel feeds need no API key; per-video views
@@ -310,8 +310,76 @@ palette; light+dark; tier colors `--trend-high/medium/low` used for score badges
   fetched/inserted/duplicates_skipped per collection).
 - **Dashboard endpoint**: cached aggregates incl. `failed_jobs_24h` honesty counter.
 
-## 9. What Comes Next (P4 → P9)
+### Model auto-discovery (`ModelCatalogService`)
 
-See `PLAN.md §4`. Immediate next: P4 dashboard completion, then P5 AI layer
-(`AIProvider` interface, research, post generation, quality gate, LLM novelty judge —
-which will replace the heuristic usefulness/novelty scoring and keyword classification).
+The Go gateway rotates its roster without notice, so hard-coded allowlists decay.
+`php artisan ai:refresh-models` (daily 03:20) and the Settings "Refresh now" button
+run the same pipeline:
+
+1. **Roster** — authenticated `GET /zen/go/v1/models` (10-min cache). General-tier
+   free models (`big-pickle`, `*-free`) are API-blocked, so only the Go endpoint is
+   used — every call there reports `cost: 0`.
+2. **Rank** — `config/ai.php` → `auto_discover`: family base weights, a version
+   bonus parsed from the id, lightweight-variant bonuses (`flash`/`lightning`/
+   `lite`/`mini` beat `pro`/`max`), and excludes (`contributor`, `vision`, `omni`,
+   `exp`, …). `created` timestamps are identical across the roster, so there is no
+   recency signal to rank by.
+3. **Probe** — tiny JSON calls to the top 10 candidates (the roster also lists
+   models that fail via chat-completions, e.g. `gpt-5.6-luna` → 500).
+4. **Store** — the 3 **fastest working** models (latency first, score tiebreak),
+   excluding the configured allowlist, are persisted in
+   `system_settings('ai.auto_models')` and appended to the provider fallback chain.
+
+If the entire chain fails, the provider dispatches `RefreshAiModelsJob`
+(unique per hour) so the next call has fresh candidates. `ai:check-models`
+probes allowlist + auto models and reports working state; Settings shows the
+list with latency, a "broken active model" warning, and a one-click switch.
+`scripts/verify-ai-fallback.php` covers both outage scenarios (allowlist
+fallback and auto-model rescue).
+
+## 9. Content Studio & Post Lifecycle
+
+### Variants grouped by trend
+Every generation is a `ContentPost` identified by **trend × format × tone × angle**
+(format/tone/angle are stored on the row; `GeneratePostJob` is unique per fingerprint).
+`GET /posts/grouped` returns trends ordered by latest variant activity with their
+variants eager-loaded — the Studio works on these groups ("New variant", "Delete all
+variants"), and the editor shows a sibling switcher for the same trend.
+
+### Permanent deletion
+`DELETE /posts/{id}` collects image file paths first, deletes the row (DB cascades
+versions + image rows), then purges files from the public disk — implemented in
+`ContentPostService`, so storage side effects never leak into controllers.
+`DELETE /posts?trend_id=` loops the same service for a whole group.
+
+### Hashtags
+The `post.user` prompt returns `hashtags` alongside title/hook/body; values are
+normalized by `App\Support\Hashtags` (`#` stripped, spaces/hyphens → PascalCase,
+alphanumeric, dedupe, max 8 × 30 chars) and persisted on the post. Posts generated
+before the feature (or edited down to zero tags) can call
+`POST /posts/{id}/hashtags` → `GenerateHashtagsJob` → `HashtagService`, which grounds
+tags in the body + trend technologies using the `hashtags.user` prompt. Copy-for-LinkedIn
+appends the tags unless the user toggles them off in Preview.
+
+### Visuals
+Snippet derivation (`SnippetService`) returns a `{code, language, title}` spec rendered
+client-side by `CodeCard`: long lines wrap, type scale adapts to the longest line, and
+five themes replace the old gradient card. Pending generations render a fixed-aspect
+skeleton, so the panel never jumps. PNG export renders an off-screen fixed-size node
+(1080×1080 or 1200×627) before `toPng`, guaranteeing complete code and zero layout shift.
+
+## 10. UI Design System
+
+Semantic tokens (`index.css`) on a cool neutral base with one brand accent; borders over
+shadows; light + dark via `next-themes`. Shared primitives live in
+`components/shared/` (`PageHeader`, `SectionHeader`, `EmptyState`, `StatusBadge`,
+`ScorePill`, `StatTile`, `Field`, `HelpTip`, `ConfirmDialog`, `CodeBlock`, `Toolbar`,
+`PostCard`). Formats and statuses are single-source modules (`lib/content-formats.ts`,
+`lib/post-status.ts`) instead of duplicated maps. Non-obvious controls carry a `HelpTip`;
+the app-level `TooltipProvider` supplies shared timing.
+
+## 11. What Comes Next
+
+See `PLAN.md §4`. Optional next: publishing-channel abstraction, a test suite
+(Pest/Vitest), query profiling, and eventually the LLM novelty judge replacing the
+heuristic usefulness scoring and keyword classification.

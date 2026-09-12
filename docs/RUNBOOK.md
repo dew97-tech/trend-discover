@@ -33,7 +33,9 @@ php artisan trends:score            # re-score all active trends
 php artisan trends:score --trend=95 # score a single trend
 php artisan trends:reclassify --dry-run  # what the word-boundary matcher would change
 php artisan trends:reclassify       # re-sync techs/category on existing trends + re-score
-php artisan ai:check-models         # live-probe every allowlisted AI model
+php artisan ai:check-models         # live-probe allowlisted + auto-discovered AI models
+php artisan ai:refresh-models       # re-discover the 3 fastest working fallbacks
+php artisan posts:generate-hashtags --missing  # backfill AI hashtags for posts without them
 ```
 
 Normal flow needs none of these — collection auto-chains detection which auto-chains
@@ -74,6 +76,7 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 |---|---|---|
 | cURL error 60 SSL | Windows PHP has no CA bundle | `curl.cainfo`/`openssl.cafile` = `C:/tools/cacert.pem` in `C:\php\php.ini` (already set) |
 | Job silently never runs after `queue:clear` | ShouldBeUnique lock persists | `DELETE FROM cache_locks;` |
+| `Unknown prompt template […]` / stale model config in jobs | long-running `queue:work` keeps the config it booted with | **After editing `config/*.php` or prompts: `php artisan queue:restart`** (workers respawn with fresh config). `config:clear` alone is not enough for a running worker. |
 | 401 from GitHub in worker but OK in tinker | stale long-running processes hold old config | kill stray `php.exe artisan serve`/workers (`tasklist`, `taskkill //PID x //F`) |
 | Eloquent says table `source_item_trend` missing | default pivot naming vs our migration | pivot names are explicit in all `belongsToMany` calls |
 | Titles like `[Dev.to/php] …` block cross-source merge | collector prefixes pollute shingles | stripped inside `TitleSimilarity::tokenize` |
@@ -86,8 +89,11 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 1. Add `{name, url}` to the right source in `SourceSeeder` — blogs go under
    `engineering-rss`, videos under `youtube` (YouTube channel RSS:
    `https://www.youtube.com/feeds/videos.xml?channel_id=UC…`; find the ID via
-   the channel page's `externalId` meta). `media:statistics` views are captured
-   automatically and counted as views ÷ 200 in engagement.
+   the channel page's `externalId` meta — a consent cookie
+   `CONSENT=YES+cb.20210328-17-p0.en+FX+917` makes the page render without the
+   redirect). `media:statistics` views are captured automatically and counted as
+   views ÷ 200 in engagement. Current channels: KodeKloud, Laravel Daily,
+   Learn with Sumit, Web Dev Cody, ByteByteGo, CodeWithHarry.
 2. `php artisan db:seed --class=SourceSeeder`
 3. Optional cron line in `routes/console.php` (youtube already runs at `35 */6`)
 4. Test: `php artisan trends:collect <source-name>` then `queue:work --stop-when-empty`;
@@ -150,6 +156,18 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
   self-heals to the config default instead of hard-failing.
   Every transition lands in the pipeline log; `scripts/verify-ai-fallback.php`
   replays a simulated outage and asserts the session header is present.
+- **Model auto-discovery (fallbacks that never expire):** `php artisan ai:refresh-models`
+  (scheduled daily 03:20) fetches `/zen/go/v1/models`, ranks candidates cheap/fast-first
+  (`config/ai.php` → `auto_discover`), probes the top 10 with tiny requests and stores
+  the 3 fastest working ids in `system_settings('ai.auto_models')` — excluding the
+  configured allowlist so the fallbacks add coverage. The provider appends them after
+  the allowlist, and dispatches `RefreshAiModelsJob` automatically when the whole chain
+  fails (unique per hour). Both outage scenarios are covered by
+  `scripts/verify-ai-fallback.php`. Manage or trigger from Settings → **Model resilience**.
+- ⚠️ OpenCode's general-tier free models (`big-pickle`, `mimo-v2.5-free`, …) are
+  **API-blocked** ("free tier can only be used in OpenCode"). Discovery therefore uses
+  the Go subscription roster only; never point the app at the general `/zen/v1`
+  endpoint (it would bill credits instead of using the Go plan).
 - Failed AI calls are recorded in `ai_generations` with `status=failed`
   (+ model, duration, error) — check there when generations misbehave.
 - Stale "running" job rows self-heal: `jobs:reconcile-stale` runs every
@@ -167,7 +185,23 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
   (AI calls take 30–90s+, which would fatal inside web requests). Frontend polls
   the images endpoint; failed rows surface a retry button.
 
-## 8d. Trend lifecycle
+## 8d. Post lifecycle & Studio
+
+- **Studio** (`/studio`) groups posts under the trend they came from: variant rows show
+  format · tone · angle, quality, hashtag count and status. "New variant" re-opens the
+  format picker for that trend; the editor has a variant switcher for siblings.
+- `DELETE /api/posts/{id}` is **permanent** — versions and image rows cascade and stored
+  files under `storage/app/public/post-images/{post}` are purged. `DELETE /api/posts?trend_id=`
+  removes all variants of a trend. Both are behind confirmation dialogs in the UI.
+- **Hashtags**: generated together with the post (3–5, PascalCase, no `#`), editable as
+  chips in the editor, and appended to the clipboard text when "Copy for LinkedIn" runs
+  (toggle in the Preview tab). Old posts can be backfilled with
+  `posts:generate-hashtags --missing` + a worker, or per-post via the editor button.
+- **Snippet cards**: the Visuals tab derives a code card via AI; the card wraps long
+  lines, themes are selectable, and PNG export renders a hidden fixed-size node
+  (1080×1080 or 1200×627) so the download never shifts the page or clips code.
+
+## 8e. Trend lifecycle
 
 - `DELETE /api/trends/{id}` = **soft delete**: trend hidden from all queries,
   source items detached (free to re-cluster), generated posts preserved in library.

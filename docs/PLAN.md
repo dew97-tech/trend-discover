@@ -2,7 +2,7 @@
 
 > Software Engineering Trend Intelligence & LinkedIn Content Manager
 > Local-first · Laravel 13 API + React 19 SPA · MySQL 8
-> **Last updated: Phase 8 (AI gateway repair + focus/hack tuning)** — see
+> **Last updated: Phase 12 (model auto-discovery + source expansion)** — see
 > `ARCHITECTURE.md` for logic details, `API.md` for endpoint reference,
 > `RUNBOOK.md` for daily operation.
 
@@ -30,7 +30,7 @@ combined with high saturation must rank BELOW moderate popularity with high nove
 | Images | ray.so-style local snippet renderer + AI-generated prompts | Phase 6; no paid image API |
 | Dev monitoring | Laravel Debugbar v4 (`--dev`) | Verified on every API call incl. JSON |
 | Prod monitoring (future) | Laravel Pulse + `job_runs` + slow-query log | Low-cost path |
-| Sources | HN Algolia, GitHub (token), Lobste.rs, Dev.to, RSS + YouTube channel feeds | **Reddit removed** — see decision log |
+| Sources | HN Algolia, GitHub (token), Lobste.rs, Dev.to, RSS + 6 YouTube channels | **Reddit removed** — see decision log |
 | Content focus | Laravel · PHP/TypeScript · React · Next.js · databases, hack/tip style | Soft boost via `topic_focus` + hack keywords — nothing excluded (D12) |
 
 ## 3. Decision Log (chronological)
@@ -52,6 +52,11 @@ combined with high saturation must rank BELOW moderate popularity with high nove
 | D13 | `x-opencode-session` header + model allowlist refresh | Go gateway added the mandatory header (all models 400 without it); `ox-alpha-free` removed, `hy3` broken — allowlist now mimo-v2.5 → deepseek-v4-flash → glm-5.3-flash, verified by `ai:check-models` |
 | D14 | YouTube via channel RSS (no Data API) | Free, keyless; `media:statistics` views captured as engagement (views ÷ 200); KodeKloud + Laravel Daily feeds |
 | D15 | Word-boundary technology matching | Fixes substring misfires ("git" inside "Arrayref"); shared by clusterer and `trends:reclassify` so existing trends can be corrected without losing generated posts |
+| D16 | Design system: cool neutral tokens, borders over shadows, light+dark | De-generic-ify the UI; `next-themes` wired, global `HelpTip` tooltips, shared primitives; measurable naming across nav/pages |
+| D17 | Studio groups variants under their trend + permanent delete | Same trend × format × tone × angle = a managed variant row, not an anonymous post; delete cascades versions and purges image files |
+| D18 | Hashtags generated with the post + AI backfill | 3–5 grounded PascalCase tags stored on the post, editable chips, included in Copy by default; `posts:generate-hashtags` backfills older posts |
+| D19 | Auto-discovered model fallbacks (Settings → Model resilience) | Gateway roster churns; daily scan ranks models cheap/fast-first, probes the top 10, stores the 3 fastest working (daily 03:20 + on total chain failure). OpenCode's general free tier is API-blocked — discovery uses the Go roster (cost 0); verify with `scripts/verify-ai-fallback.php` |
+| D20 | YouTube channels expanded to 6 | Sumit Saha (Learn with Sumit), Web Dev Cody, ByteByteGo, CodeWithHarry join KodeKloud + Laravel Daily; views captured from `media:statistics` and counted ÷200 |
 
 ## 4. Progress Status
 
@@ -66,15 +71,22 @@ combined with high saturation must rank BELOW moderate popularity with high nove
 | P6 | Image studio: ray.so-style snippet renderer + AI image-prompt generator | ✅ complete |
 | P7 | Content library, lifecycle UI, copy/download workflow, jobs monitoring screen, Settings | ✅ complete |
 | P8 | AI gateway session-header repair, model refresh, focus/hack scoring, curated sources, hack post formats | ✅ complete |
-| P9 | Publishing channel abstraction + settings toggles (optional) | ⬜ next |
-| P10 | Pest/Vitest tests, query profiling pass, hardening | ⬜ |
+| P9 | Design system (tokens, primitives, HelpTips), AppShell + mobile nav, theme toggle, shared format/status modules | ✅ complete |
+| P10 | Grouped Studio, variant management, permanent delete (API + UI), editor full-width tabs, Visuals/CodeCard rebuild | ✅ complete |
+| P11 | Intelligent hashtags: bundled generation, editable chips, AI suggest/backfill, copy integration | ✅ complete |
+| P12 | Overview/Trends/Jobs/Settings/Auth refresh + model auto-discovery + YouTube expansion | ✅ complete |
+| P13 | Publishing channel abstraction + settings toggles (optional) | ⬜ next |
+| P14 | Pest/Vitest tests, query profiling pass, hardening | ⬜ |
 
 ### Current system state (verified 2026-09-12)
 
-- **262 source items** across 6 sources: HN(100), RSS(218), GitHub(34), YouTube(30), Lobste.rs(18), Dev.to(11)
-- **252 trends** clustered and scored with the focus dimensions; 31 focus-100, 1 focus-55
-- AI pipeline verified end-to-end on the new models (research → post → quality ≈ 37s)
-  and a `quick_tip` generation for a Laravel trend scored 87.5/ready
+- **633 source items** across 6 sources: RSS(218), HN(200), YouTube(90), GitHub(68), Lobste.rs(32), Dev.to(25)
+- **403 trends** clustered and scored with the focus dimensions
+- AI pipeline verified end-to-end; all posts have hashtags (12 backfilled via `posts:generate-hashtags --missing`)
+- **Model resilience live**: auto-discovered fallbacks `deepseek-v4.1-flash`, `qwen3.8-flash`, `glm-5.1`
+  (fastest working after probing the roster); both outage scenarios pass `scripts/verify-ai-fallback.php`
+- **YouTube: 6 channels** (KodeKloud, Laravel Daily, Learn with Sumit, Web Dev Cody, ByteByteGo, CodeWithHarry),
+  15 items/feed with view metrics captured
 - Word-boundary reclassification corrected 46 existing trends in place (posts preserved)
 - Dedup proven idempotent (re-run inserts 0); junk dampening live; collections auto-chain
   into clustering + scoring

@@ -21,5 +21,8 @@ Schedule::command('trends:collect youtube')->cron('35 */6 * * *')->withoutOverla
 // Nightly full re-score keeps decayed scores honest.
 Schedule::command('trends:score')->dailyAt('02:00');
 
+// Gateway rotates its model roster; refresh cheap/fast fallbacks daily.
+Schedule::command('ai:refresh-models')->dailyAt('03:20');
+
 // Lying "running" rows (worker killed mid-job) break monitoring trust.
 Schedule::command('jobs:reconcile-stale')->everyFifteenMinutes();

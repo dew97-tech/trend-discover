@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/settings', [SettingController::class, 'index']);
     Route::patch('/settings', [SettingController::class, 'update']);
     Route::get('/settings/models', [SettingController::class, 'models']);
+    Route::post('/settings/models/refresh', [SettingController::class, 'refreshModels']);
 
     Route::get('/taxonomy', [TrendController::class, 'taxonomy']);
     Route::get('/trends', [TrendController::class, 'index']);
@@ -59,10 +60,14 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/trends/{id}/restore', [TrendController::class, 'restore']);
 
     Route::get('/posts', [PostController::class, 'index']);
+    Route::get('/posts/grouped', [PostController::class, 'grouped']);
+    Route::delete('/posts', [PostController::class, 'destroyByTrend']);
     Route::get('/posts/{id}', [PostController::class, 'show']);
     Route::patch('/posts/{id}', [PostController::class, 'update']);
+    Route::delete('/posts/{id}', [PostController::class, 'destroy']);
     Route::post('/posts/{id}/status', [PostController::class, 'updateStatus']);
     Route::post('/posts/{id}/regenerate', [PostController::class, 'regenerate']);
+    Route::post('/posts/{id}/hashtags', [PostController::class, 'generateHashtags']);
 
     // Visual assets for posts
     Route::get('/posts/{post}/images', [ContentImageController::class, 'index']);

@@ -123,3 +123,93 @@ Extends the list shape with:
 
 ### `GET /taxonomy` 🔒 (cached 24h)
 Categories + active technologies for building filter dropdowns.
+
+---
+
+## Settings & AI models
+
+### `GET /settings` 🔒
+Weights, limits, active model, `auto_discover`, `auto_models`, `models_refreshed_at`.
+
+### `PATCH /settings` 🔒
+Accepts `weights`, `limits`, `model` (allowlist ∪ auto-discovered ids), `auto_discover` (boolean).
+
+### `GET /settings/models` 🔒
+Merged catalogue with live status:
+```json
+{ "models": [
+    { "id": "mimo-v2.5", "label": "MiMo-V2.5", "reasoning": true,
+      "source": "allowlist", "on_gateway": true, "working": null, "latency_ms": null },
+    { "id": "deepseek-v4.1-flash", "label": "Deepseek V4 1 Flash", "reasoning": false,
+      "source": "auto", "on_gateway": true, "working": true, "latency_ms": 2049 }
+  ],
+  "active": "mimo-v2.5",
+  "gateway_reachable": true,
+  "auto_discover": true,
+  "last_refreshed_at": "2026-09-12T17:37:44+00:00" }
+```
+
+### `POST /settings/models/refresh` 🔒 → **202**
+Queues `RefreshAiModelsJob`: fetches the live Go-tier roster, ranks candidates
+cheap/fast-first, probes the top 10, and stores the 3 fastest working models as
+automatic fallbacks (`system_settings.ai.auto_models`). Scheduled daily at 03:20
+and triggered automatically when the whole provider chain fails.
+
+> OpenCode's public free tier (`big-pickle`, `*-free`) is API-blocked; discovery
+> only uses the Go subscription endpoint (`/zen/go/v1`, cost 0).
+
+## Posts
+
+Every generated variant is a `ContentPost` (format × tone × angle per trend).
+
+### `GET /posts` 🔒
+Flat lifecycle list. Query: `filter[status]` (comma-separated), `filter[format]`,
+`filter[trend_id]`, `filter[search]`, `per_page` (1–50, default 20), `cursor`.
+
+### `GET /posts/grouped` 🔒
+Posts grouped under their trend — powers the Studio. Query: `status`, `format`,
+`search`, `per_page` (1–25, default 10), `cursor` (paginates **trend groups**).
+
+```json
+{
+  "data": [{
+    "trend": { "id": 235, "title": "118M Queries per Second on Neki",
+               "category": {"id":3,"name":"Databases & Query Optimization","slug":"databases"},
+               "trend_score": 59.26, "focus_score": 100, "hack_style": false, "deleted": false },
+    "post_count": 1,
+    "latest_at": "…",
+    "posts": [ ContentPost… ]
+  }],
+  "next_cursor": "…" | null
+}
+```
+
+### `GET /posts/{id}` 🔒 — full post + `versions` count + trend title
+### `PATCH /posts/{id}` 🔒 — edit `title`/`hook`/`body`/`hashtags[]`; every save snapshots a version
+### `POST /posts/{id}/status` 🔒 — `draft|review|ready|archived`
+### `POST /posts/{id}/regenerate` 🔒 → **202** queues a fresh draft with the same format/tone/angle (lands as a new variant)
+### `POST /posts/{id}/hashtags` 🔒 → **202** queues AI hashtag selection (worker fills the post)
+### `DELETE /posts/{id}` 🔒 — **permanent**: versions + image rows cascade, stored image files are purged
+### `DELETE /posts?trend_id={id}` 🔒 — permanent delete of every variant for one trend
+
+`PostResource` fields: `id, trend_id, trend{id,title}, title, hook, body, hashtags[],
+format, tone, angle, status, quality_score, quality_breakdown, word_count,
+version_count, generated_at, updated_at`.
+
+Hashtags are normalized server-side: `#` stripped, spaces/hyphens joined PascalCase,
+alphanumeric only, deduped, max 8 tags × 30 chars.
+
+### Post formats
+`quick_tip`, `laravel_hack`, `sql_hack`, `react_hack`, `nextjs_hack`,
+`technical_insight`, `optimization_tip`, `problem_solution`, `before_after`,
+`engineering_lesson`, `release_highlight`, `tool_discovery`,
+`performance_breakdown`, `architecture_insight`, `debugging_story`,
+`developer_debate`, `case_study`.
+
+## Visual assets
+
+### `GET /posts/{post}/images` 🔒 — snippet / prompt / upload rows
+### `POST /posts/{post}/images/snippet` 🔒 → **202** queue a code-card spec (`?force` to regenerate)
+### `POST /posts/{post}/images/prompt` 🔒 → **202** queue an AI image prompt
+### `POST /posts/{post}/images/upload` 🔒 — multipart `image` (max 4MB)
+### `DELETE /images/{id}` 🔒 — removes the row and its file

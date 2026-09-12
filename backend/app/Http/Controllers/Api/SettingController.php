@@ -17,7 +17,10 @@ class SettingController extends Controller
         'topic_focus',
     ];
 
-    public function __construct(private readonly \App\Services\AI\PromptRegistry $prompts) {}
+    public function __construct(
+        private readonly \App\Services\AI\PromptRegistry $prompts,
+        private readonly \App\Services\AI\ModelCatalogService $catalog,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -28,20 +31,27 @@ class SettingController extends Controller
             'limits' => SystemSetting::get('generation.limits', []),
             'model' => SystemSetting::get('ai.model', config('ai.providers.opencode_go.model')),
             'allowed_models' => config('ai.providers.opencode_go.allowed_models'),
+            'auto_discover' => $this->catalog->autoDiscoverEnabled(),
+            'auto_models' => $this->catalog->autoModels(),
+            'models_refreshed_at' => $this->catalog->refreshedAt(),
         ]);
     }
 
     public function update(Request $request): JsonResponse
     {
+        $allowedModels = array_merge(
+            array_keys(config('ai.providers.opencode_go.allowed_models', [])),
+            array_column($this->catalog->autoModels(), 'id'),
+        );
+
         $validated = $request->validate([
             'weights' => ['sometimes', 'array'],
             'weights.*' => ['numeric', 'between:0,1'],
             'limits.max_generations_per_trend' => ['sometimes', 'integer', 'between:1,10'],
             'limits.max_image_prompts_per_post' => ['sometimes', 'integer', 'between:0,5'],
             'limits.daily_ai_call_budget' => ['sometimes', 'integer', 'between:1,5000'],
-            'model' => ['sometimes', 'string', \Illuminate\Validation\Rule::in(
-                array_keys(config('ai.providers.opencode_go.allowed_models', [])),
-            )],
+            'auto_discover' => ['sometimes', 'boolean'],
+            'model' => ['sometimes', 'string', \Illuminate\Validation\Rule::in($allowedModels)],
         ]);
 
         if (isset($validated['weights'])) {
@@ -71,6 +81,10 @@ class SettingController extends Controller
             );
         }
 
+        if (isset($validated['auto_discover'])) {
+            SystemSetting::put('ai.auto_discover', (bool) $validated['auto_discover'], group: 'ai');
+        }
+
         if (isset($validated['model'])) {
             SystemSetting::put('ai.model', $validated['model'], group: 'ai');
         }
@@ -78,6 +92,17 @@ class SettingController extends Controller
         \Illuminate\Support\Facades\Cache::forget('taxonomy:categories-technologies');
 
         return $this->index();
+    }
+
+    /**
+     * Queues a full model-catalog refresh (roster -> rank -> probe -> store
+     * the fastest working fallbacks).
+     */
+    public function refreshModels(): JsonResponse
+    {
+        \App\Jobs\RefreshAiModelsJob::dispatch();
+
+        return response()->json(['message' => 'Model refresh queued — check back in a minute.'], 202);
     }
 
     /**
@@ -102,15 +127,34 @@ class SettingController extends Controller
             $gatewayIds = [];
         }
 
+        $health = $this->catalog->health();
+
+        $allowlist = collect($profiles)->map(fn (array $profile, string $id) => [
+            'id' => $id,
+            'label' => $profile['label'] ?? $id,
+            'reasoning' => (bool) ($profile['reasoning'] ?? false),
+            'source' => 'allowlist',
+            'on_gateway' => in_array($id, $gatewayIds, true),
+            'working' => $health[$id]['ok'] ?? null,
+            'latency_ms' => $health[$id]['latency_ms'] ?? null,
+        ])->values();
+
+        $auto = collect($this->catalog->autoModels())->map(fn (array $model) => [
+            'id' => $model['id'],
+            'label' => $model['label'] ?? $model['id'],
+            'reasoning' => false,
+            'source' => 'auto',
+            'on_gateway' => in_array($model['id'], $gatewayIds, true),
+            'working' => $health[$model['id']]['ok'] ?? true,
+            'latency_ms' => $model['latency_ms'] ?? ($health[$model['id']]['latency_ms'] ?? null),
+        ]);
+
         return response()->json([
-            'models' => collect($profiles)->map(fn (array $profile, string $id) => [
-                'id' => $id,
-                'label' => $profile['label'] ?? $id,
-                'reasoning' => (bool) ($profile['reasoning'] ?? false),
-                'on_gateway' => in_array($id, $gatewayIds, true),
-            ])->values()->all(),
+            'models' => $allowlist->concat($auto)->values()->all(),
             'active' => SystemSetting::get('ai.model', config('ai.providers.opencode_go.model')),
             'gateway_reachable' => $gatewayIds !== [],
+            'auto_discover' => $this->catalog->autoDiscoverEnabled(),
+            'last_refreshed_at' => $this->catalog->refreshedAt(),
         ]);
     }
 

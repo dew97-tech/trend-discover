@@ -24,6 +24,14 @@ final class OpenCodeGoProvider implements AIProvider
         $config = config('ai.providers.opencode_go');
         $profiles = $config['allowed_models'];
 
+        $catalog = app(ModelCatalogService::class);
+        $autoModels = $catalog->autoDiscoverEnabled()
+            ? array_values(array_filter(array_column($catalog->autoModels(), 'id')))
+            : [];
+
+        $isUsable = fn (string $id): bool => isset($profiles[$id])
+            || in_array($id, $autoModels, true);
+
         // Settings UI override wins over .env so models are swappable at runtime.
         $active = (string) (
             \App\Models\SystemSetting::get('ai.model')
@@ -31,27 +39,37 @@ final class OpenCodeGoProvider implements AIProvider
         );
 
         // A stored model can outlive its gateway (dead/renamed id). Self-heal:
-        // log, then use the allowlisted config default instead of hard-failing.
-        if (! isset($profiles[$active])) {
-            Log::channel('pipeline')->warning('[OpenCodeGoProvider] stored model no longer allowlisted — using config default', [
+        // log, then prefer the config default, then the best discovered model.
+        if (! $isUsable($active)) {
+            Log::channel('pipeline')->warning('[OpenCodeGoProvider] active model no longer usable — self-healing', [
                 'stored' => $active,
                 'default' => $config['model'],
+                'auto' => $autoModels,
             ]);
 
-            $active = (string) $config['model'];
+            $active = $isUsable((string) $config['model'])
+                ? (string) $config['model']
+                : (string) ($autoModels[0] ?? '');
         }
 
-        if (! isset($profiles[$active])) {
+        if ($active === '') {
             throw new \RuntimeException(
-                "Model [$active] is not in the approved allowlist. Allowed: ".
-                implode(', ', array_keys($profiles)),
+                'No usable model: the allowlist ids are gone from the gateway and no auto-discovered '.
+                'fallbacks are stored. Run `php artisan ai:refresh-models`.',
             );
         }
 
-        // Candidate chain: active first, then remaining models in cost order.
+        // Candidate chain: active -> configured fallbacks -> auto-discovered.
         $chain = [$active];
+
         foreach (($config['fallback_order'] ?? []) as $candidate) {
             if ($candidate !== $active && isset($profiles[$candidate])) {
+                $chain[] = $candidate;
+            }
+        }
+
+        foreach ($autoModels as $candidate) {
+            if ($candidate !== $active && ! in_array($candidate, $chain, true)) {
                 $chain[] = $candidate;
             }
         }
@@ -64,7 +82,10 @@ final class OpenCodeGoProvider implements AIProvider
             try {
                 [$response, $rawContent] = $this->completeOnModel(
                     $model,
-                    $profiles[$model],
+                    $profiles[$model] ?? [
+                        'reasoning' => false,
+                        'max_output' => (int) config('ai.max_tokens_per_call', 4096),
+                    ],
                     $systemPrompt,
                     $userPrompt,
                 );
@@ -122,9 +143,16 @@ final class OpenCodeGoProvider implements AIProvider
             );
         }
 
+        // Self-healing: the whole chain died, so refresh the discovered
+        // fallbacks in the background for the next call (unique per hour).
+        if ($catalog->autoDiscoverEnabled()) {
+            \App\Jobs\RefreshAiModelsJob::dispatch();
+        }
+
         throw new \RuntimeException(
-            'All allowlisted models failed. Attempts: '.implode(' | ', $tried).
-            '. Last error: '.($lastError?->getMessage() ?? 'unknown'),
+            'All models failed. Attempts: '.implode(' | ', $tried).
+            '. Last error: '.($lastError?->getMessage() ?? 'unknown').
+            '. A model-catalog refresh was queued — verify with `php artisan ai:refresh-models`.',
         );
     }
 
@@ -190,7 +218,7 @@ final class OpenCodeGoProvider implements AIProvider
         return Http::baseUrl($this->apiRoot())
             ->timeout((int) config('ai.providers.opencode_go.timeout'))
             ->withToken((string) config('ai.providers.opencode_go.api_key'))
-            ->withHeaders(['x-opencode-session' => $this->sessionId()])
+            ->withHeaders(['x-opencode-session' => ModelCatalogService::sessionId()])
             ->retry(
                 (int) config('ai.providers.opencode_go.max_retries'),
                 1000,
@@ -202,46 +230,11 @@ final class OpenCodeGoProvider implements AIProvider
     }
 
     /**
-     * Stable routing session for the gateway (prompt-cache affinity).
-     * Priority: env override → persisted UUID → generate + persist once.
-     */
-    private function sessionId(): string
-    {
-        $configured = trim((string) config('ai.providers.opencode_go.session_id'));
-
-        if ($configured !== '') {
-            return $configured;
-        }
-
-        $stored = \App\Models\SystemSetting::get('ai.session_id');
-
-        if (is_string($stored) && trim($stored) !== '') {
-            return $stored;
-        }
-
-        $generated = (string) \Illuminate\Support\Str::uuid();
-
-        \App\Models\SystemSetting::put('ai.session_id', $generated, group: 'ai');
-
-        Log::channel('pipeline')->info('[OpenCodeGoProvider] generated gateway session id', [
-            'session_id' => $generated,
-        ]);
-
-        return $generated;
-    }
-
-    /**
      * Users may paste either the API root or the full endpoint.
      */
     private function apiRoot(): string
     {
-        $url = rtrim(trim((string) config('ai.providers.opencode_go.base_url')), '/');
-
-        if (str_ends_with($url, '/chat/completions')) {
-            $url = substr($url, 0, -strlen('/chat/completions'));
-        }
-
-        return rtrim($url, '/');
+        return ModelCatalogService::apiRoot();
     }
 
     /**

@@ -19,7 +19,10 @@ class PromptRegistry
         $overrides = SystemSetting::get('ai.prompts', []) ?? [];
 
         return $overrides[$key] ?? config("prompts.$key")
-            ?? throw new \InvalidArgumentException("Unknown prompt template [$key].");
+            ?? throw new \InvalidArgumentException(
+                "Unknown prompt template [$key]. If you just added it, note that long-running ".
+                'queue workers cache config in memory — run `php artisan queue:restart` and retry.',
+            );
     }
 
     /**

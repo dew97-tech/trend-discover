@@ -92,6 +92,10 @@ class SourceSeeder extends Seeder
                     'feeds' => [
                         ['name' => 'KodeKloud', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCSWj8mqQCcrcBlXPi4ThRDQ'],
                         ['name' => 'Laravel Daily Video', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCTuplgOBi6tJIlesIboymGA'],
+                        ['name' => 'Learn with Sumit', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCFM3gG5IHfogarxlKcIHCAg'],
+                        ['name' => 'Web Dev Cody', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsrVDPJBYeXItETFHG0qzyw'],
+                        ['name' => 'ByteByteGo', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCZgt6AzoyjslHTC9dz0UoTw'],
+                        ['name' => 'CodeWithHarry', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCeVMnSShP_Iviwkknt83cww'],
                     ],
                     'items_per_feed' => 15,
                 ],
