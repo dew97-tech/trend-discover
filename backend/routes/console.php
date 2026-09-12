@@ -16,6 +16,7 @@ Schedule::command('trends:collect github')->cron('30 */6 * * *')->withoutOverlap
 Schedule::command('trends:collect rss')->cron('20 */3 * * *')->withoutOverlapping();
 Schedule::command('trends:collect devto')->cron('45 */8 * * *')->withoutOverlapping();
 Schedule::command('trends:collect lobsters')->cron('10 */3 * * *')->withoutOverlapping();
+Schedule::command('trends:collect youtube')->cron('35 */6 * * *')->withoutOverlapping();
 
 // Nightly full re-score keeps decayed scores honest.
 Schedule::command('trends:score')->dailyAt('02:00');

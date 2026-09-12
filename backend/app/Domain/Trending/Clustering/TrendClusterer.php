@@ -3,7 +3,6 @@
 namespace App\Domain\Trending\Clustering;
 
 use App\Models\SourceItem;
-use App\Models\Technology;
 use App\Models\Trend;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -223,45 +222,28 @@ class TrendClusterer
      */
     private function classify(SourceItem $item): array
     {
-        $haystack = mb_strtolower(
+        return (new TechnologyClassifier())->classify(
             $item->title.' '.
             implode(' ', $item->metadata['tags'] ?? []).' '.
             ($item->metadata['language'] ?? '').' '.
             ($item->summary ?? ''),
         );
-
-        $technologies = Technology::query()
-            ->where('is_active', true)
-            ->get(['id', 'name', 'slug', 'aliases', 'category_id']);
-
-        $matched = $technologies->filter(function (Technology $tech) use ($haystack) {
-            $names = [$tech->name, str_replace('-', ' ', $tech->slug), ...($tech->aliases ?? [])];
-
-            foreach ($names as $name) {
-                if ($name !== '' && str_contains($haystack, mb_strtolower($name))) {
-                    return true;
-                }
-            }
-
-            return false;
-        });
-
-        $technologyIds = $matched->pluck('id')->take(6)->all();
-        $categoryId = $matched->first()?->category_id;
-
-        return [$categoryId, $technologyIds];
     }
 
     private function engagement(SourceItem $item): int
     {
         $m = $item->metrics ?? [];
 
+        // YouTube view counts are 100-1000x larger than points/stars; ÷200
+        // brings them into the same order of magnitude for momentum scoring.
+        $views = intdiv((int) ($m['views'] ?? 0), 200);
+
         $primary = (int) ($m['points']
             ?? $m['score']
             ?? $m['stars']
             ?? $m['upvotes']
             ?? $m['reactions']
-            ?? 0);
+            ?? $views);
 
         return $primary + 2 * (int) ($m['comments'] ?? 0);
     }

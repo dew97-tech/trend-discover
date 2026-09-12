@@ -48,6 +48,55 @@ final class DimensionScorers
         return (float) min(100, 20 + 25 * $techCount + ($hasCategory ? 15 : 0));
     }
 
+    /**
+     * Focus-topic alignment (soft boost, never a hard filter):
+     * 100 = a focus technology is attached, 55 = focus category only, 0 = none.
+     */
+    public static function focus(Trend $trend): float
+    {
+        $technologySlugs = config('trending.focus.technology_slugs', []);
+
+        if ($technologySlugs !== [] && $trend->technologies()
+            ->whereIn('technologies.slug', $technologySlugs)
+            ->exists()) {
+            return 100.0;
+        }
+
+        $categorySlugs = config('trending.focus.category_slugs', []);
+
+        if ($categorySlugs !== [] && $trend->category()
+            ->whereIn('categories.slug', $categorySlugs)
+            ->exists()) {
+            return 55.0;
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Distinct hack/tip-style keyword hits in title + summary.
+     * Word-boundary matching so "multiple" doesn't count as "tip".
+     */
+    public static function hackHits(Trend $trend): int
+    {
+        $keywords = config('trending.hack_keywords', []);
+
+        if ($keywords === []) {
+            return 0;
+        }
+
+        $text = mb_strtolower($trend->title.' '.($trend->summary ?? ''));
+        $hits = 0;
+
+        foreach ($keywords as $keyword) {
+            if (preg_match('/\b'.preg_quote($keyword, '/').'\b/u', $text) === 1) {
+                $hits++;
+            }
+        }
+
+        return $hits;
+    }
+
     /** Practical-usefulness heuristics until the Phase-5 LLM judge arrives. */
     public static function usefulness(Trend $trend): float
     {
@@ -75,6 +124,14 @@ final class DimensionScorers
         }
 
         $score = min(100, 55 + 15 * $hits);
+
+        // Hack/tip phrasing is the content shape we want — boost it.
+        $hackHits = min(
+            self::hackHits($trend),
+            (int) config('trending.hack_bonus_max_hits', 3),
+        );
+
+        $score = min(100, $score + (int) config('trending.hack_bonus_per_hit', 9) * $hackHits);
 
         if (isset($flags['emoji_heavy'])) {
             $score = min($score, 45.0);

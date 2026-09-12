@@ -16,7 +16,7 @@ class Trend extends Model
     protected $fillable = [
         'category_id', 'title', 'summary', 'status',
         'trend_score', 'novelty_score', 'freshness_score', 'momentum_score',
-        'relevance_score', 'usefulness_score', 'saturation_score',
+        'relevance_score', 'usefulness_score', 'focus_score', 'saturation_score',
         'why_matters', 'angles', 'metrics', 'research',
         'item_count', 'first_seen_at', 'last_seen_at', 'researched_at',
     ];

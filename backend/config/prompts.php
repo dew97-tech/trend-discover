@@ -85,6 +85,12 @@ TXT,
     ],
 
     'format_guidance' => [
+        // Practical hack formats — the KodeKloud-style core of the product.
+        'quick_tip' => 'One concrete tip a working engineer can apply today. Show the exact code, command or config — no lecture, no history.',
+        'sql_hack' => 'A specific SQL/database technique (indexing, EXPLAIN, N+1, schema, query rewrite). Show the before and after query and why the planner changes.',
+        'laravel_hack' => 'A specific Laravel/Artisan/Eloquent technique. Show the exact command, code or config change — the kind of thing you would paste in a real project.',
+        'react_hack' => 'A specific React technique (hooks, rendering, state, memoization). Minimal code example, one clear payoff.',
+        'nextjs_hack' => 'A specific Next.js technique (App Router, server components, caching, ISR, routing). Name the exact file or config and the gotcha it fixes.',
         'technical_insight' => 'Explain one non-obvious technical truth with concrete specifics.',
         'optimization_tip' => 'One actionable optimization with the measurable effect it had.',
         'problem_solution' => 'Start from a real symptom, walk to the fix in 3-4 steps.',

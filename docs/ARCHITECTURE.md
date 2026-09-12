@@ -14,11 +14,12 @@ HN Algolia     ─┐                                           ┌─→ exact 
 GitHub (token)  │    HnCollector      ┌───────────────┐     │   fuzzy title match
 Lobste.rs JSON  ├─→ GitHubCollector ─→│ source_items  │────→│        ↓
 Dev.to         │    LobsteRsCollector │ (normalized,  │     │   TREND CLUSTERER
-RSS feeds      ├─→ DevToCollector    │  deduped)     │     │        ↓
-               ┘    RssCollector      └───────────────┘     │   SCORE ENGINE
-                                                            │   (6 dimensions +
-                       CollectSourceItemsJob                │    saturation penalty)
-                       auto-chains on insert > 0  ──────────┘        ↓
+RSS + YouTube  ├─→ DevToCollector    │  deduped)     │     │        ↓
+feeds          ┘    RssCollector      └───────────────┘     │   SCORE ENGINE
+                                                             │   (9 dimensions +
+                        CollectSourceItemsJob                │    focus boost +
+                        auto-chains on insert > 0  ──────────┘    saturation penalty)
+                                                                      ↓
                                                      DetectTrendsJob → CalculateTrendScoreJob(s)
 ```
 
@@ -67,10 +68,15 @@ collection is therefore **idempotent** — verified live: second run fetched 100
 | Source | Key filters | Auth |
 |---|---|---|
 | hacker-news | points > 30–40, last 14 days | none |
-| github | created ≤10 days, stars ≥150 + watched topics + release repos | PAT via `config('services.github.token')` |
+| github | created ≤10 days, stars ≥150 + watched topics (laravel, react, nextjs, mysql, database…) + release repos | PAT via `config('services.github.token')` |
 | lobsters | score ≥15, last 72h, `/newest.json` ×2 pages | none |
-| dev-to | reactions ≥5, last 7 days (public API ignores sort-by-popularity — see note) | none |
-| engineering-rss | Laravel News, InfoQ, Smashing; 25 items/feed | none |
+| dev-to | tags incl. laravel, php, react, nextjs, sql, mysql, database; reactions ≥5, last 7 days (public API ignores sort-by-popularity — see note) | none |
+| engineering-rss | Laravel News, Laravel Daily, Laracasts, Next.js Blog, React Blog, Vercel, Percona MySQL, PlanetScale, InfoQ, Smashing; 25 items/feed | none |
+| youtube | KodeKloud + Laravel Daily channel RSS; 15 videos/feed. `media:statistics` views → metrics (engagement counts views ÷ 200) | none |
+
+> Focus sources were chosen to feed the Laravel/PHP/TS/React/Next.js/database
+> hack-content pipeline. YouTube channel feeds need no API key; per-video views
+> come from the Media RSS extension parsed in `RssCollector`.
 
 > **Documented API quirk:** Dev.to's `top=N` parameter means "articles from N months ago",
 > not "top N". We fetch `/articles/latest` and filter by recency + reactions ourselves.
@@ -135,13 +141,19 @@ On attach, the cluster:
 
 ### Classification
 
-Title + summary + tags are matched against `technologies` (names/slugs/aliases).
-First matched technology's `category_id` becomes the trend category; up to 6 technologies
-sync to the pivot.
+Title + summary + tags are matched against `technologies` (names/slugs/aliases) by
+`TechnologyClassifier`, shared between clustering and the `trends:reclassify` command.
+Matching is **word-boundary based** (`(?<![\p{L}\p{N}])name(?![\p{L}\p{N}])`), which
+fixed the documented substring misfires — alias "git" no longer matches inside
+"Arrayref", "react" no longer matches "reactive". Dotted (`next.js`) and multi-word
+(`app router`) aliases work. Aliases were expanded for focus techs (artisan/eloquent/
+blade → Laravel; app router/server components → Next.js; InnoDB/query plan → MySQL;
+react hooks/JSX → React). First matched technology's `category_id` becomes the trend
+category; up to 6 technologies sync to the pivot. LLM classification remains a Phase-5
+improvement path.
 
-**Known limitation:** substring matching can misfire — e.g. the Rust security story
-matched alias "git" inside "Arrayref… payload" text and landed in "Frontend Engineering".
-Improvement path: word-boundary matching now, LLM classification in Phase 5.
+Existing trends can be reclassified in place (posts preserved) with
+`php artisan trends:reclassify` — it re-syncs techs/category and queues re-scoring.
 
 ---
 
@@ -156,10 +168,15 @@ trend_score = Σ(weight_i × dimension_i) − saturation_penalty_weight × satur
 Default weights (editable without redeploy):
 
 ```
-freshness .18   momentum .14   technical_relevance .18   practical_usefulness .15
-novelty .20     developer_interest .05   discussion_potential .05   source_reliability .05
+freshness .16    momentum .13    technical_relevance .16    practical_usefulness .14
+novelty .18      topic_focus .08 developer_interest .05     discussion_potential .05
+source_reliability .05
 saturation_penalty_weight .25
 ```
+
+The composite is divided by the sum of positive weights, so legacy stored weight
+sets (which sum ≈1.00 without `topic_focus`) and future rebalancings both produce a
+0–100 score without migration.
 
 ### Dimension formulas
 
@@ -168,13 +185,29 @@ saturation_penalty_weight .25
 | freshness | `100 × 0.5^(age_hours / 36)` floor 5 | half-life 36h on newest item |
 | momentum | `50 × log10(1 + total_engagement / hours_since_first_seen)` | 100 @ ~100/hour |
 | relevance | `20 + 25×matched_techs + 15×(has_category)` | capped 100 |
-| usefulness | `55 + 15×keyword_hits`, junk-flag caps applied | keywords: optimiz/performance/benchmark/debug/guide/deep dive/scaling/security… |
+| usefulness | `55 + 15×keyword_hits + 9×hack_hits` (max 3 hack hits), junk-flag caps applied | keywords: optimiz/performance/benchmark/debug/guide/deep dive/scaling/security… plus `config/trending.php` hack keywords (word-boundary) |
+| focus | `100` focus technology attached · `55` focus category only · `0` none | soft boost only — never hides a trend |
 | interest | `(100/3) × log10(1 + total_engagement)` | 100 @ ~1000 pts |
 | discussion | `min(1, comments/engagement) × 200` | comment-heavy stories win |
 | source_reliability | `65 + 10×distinct_sources` | capped 100 |
 
 Engagement normalization per source type:
-`primary(points|score|stars|reactions) + 2×comments`.
+`primary(points|score|stars|reactions|views÷200) + 2×comments`.
+YouTube views are 100–1000× larger than points/stars; the ÷200 divisor brings them
+into the same order of magnitude so one viral video can't dominate momentum.
+
+### Focus & hack style (the "practical hacks" product turn)
+
+`config/trending.php` defines the focus technology slugs (Laravel, PHP, TypeScript,
+React, Next.js, MySQL/MariaDB/PostgreSQL/SQLite) and hack keywords (tip/trick/hack/
+one-liner/gotcha/EXPLAIN/query plan/index/…). Two effects, both soft:
+
+1. `topic_focus` weight (`0.08` default) boosts focus-matching trends in ranking.
+2. Hack phrasing raises `usefulness_score` and, at ≥2 distinct keywords, sets
+   `metrics.hack_style = true` → `hack_style` badge in the Explorer.
+
+Nothing is excluded: a non-focus trend with strong signals still competes, it just
+lacks the boost.
 
 ### Saturation analysis (`SaturationAnalyzer`) — the anti-"already everywhere" check
 
@@ -192,7 +225,13 @@ Novelty is then derived: `novelty = clamp(100 − 0.7×saturation + 0.3×freshne
 This enforces the core product rule: a story covered by every source with many sibling
 clusters gets penalized even if raw popularity is huge, letting a fresh niche topic rank above it.
 
-### Worked example — real trend #95
+### Worked example — real trend #95 (Phase-3 snapshot)
+
+> Historical example. Weights shown are the pre-focus defaults and the relevance
+> score reflects the old substring classifier — word-boundary matching later
+> corrected this exact trend to *no* technology match (it's a Rust security story).
+> The computation mechanics (weighted dimensions − saturation penalty) are unchanged;
+> the engine now adds `topic_focus` and normalizes by the positive weight sum.
 
 **Input:** *"Malicious Rust crate Arrayref runs a build-time payload"* (HN, 1 item,
 first/last seen 2026-08-20 ~13:23 UTC, scored ~24h later):

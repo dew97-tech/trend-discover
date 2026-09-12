@@ -78,6 +78,7 @@ Composable filters (all optional):
 | `status` | discovered\|researching\|researched\|archived | |
 | `min_trend_score`, `min_novelty_score` | 0–100 | |
 | `max_saturation` | 0–100 | |
+| `focus` | boolean | only trends matching focus topics (Laravel/PHP/TS/React/Next.js/databases) |
 | `from` | date | first_seen_at ≥ from |
 | `per_page` | 5–50 (default 25) | cursor pagination |
 | `cursor` | opaque string | from previous response |
@@ -90,12 +91,17 @@ Composable filters (all optional):
     "status":"discovered",
     "category":{"id":2,"name":"Frontend Engineering","slug":"frontend-engineering"},
     "scores":{"trend":75.35,"novelty":100,"freshness":61.29,"momentum":87.75,
-              "relevance":85,"usefulness":55,"saturation":13.73},
+              "relevance":85,"usefulness":55,"focus":0,"saturation":13.73},
+    "hack_style": false,
     "item_count":1, "first_seen_at":"…", "last_seen_at":"…"
   }],
   "next_cursor": "…" | null
 }
 ```
+
+- `scores.focus` — focus-topic alignment: 100 = focus technology attached,
+  55 = focus category only, 0 = none (soft boost only, never an exclusion).
+- `hack_style` — true when ≥2 hack/tip/trick keywords appear in title+summary.
 
 Example: top high-scoring security trends this week:
 ```

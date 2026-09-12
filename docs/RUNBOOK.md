@@ -26,10 +26,14 @@ Login at `http://localhost:5173` — sessions last 60 minutes.
 
 ```bash
 php artisan trends:collect          # collect from ALL enabled sources
-php artisan trends:collect hn       # one source: hn|github|rss|devto|lobsters
+php artisan trends:collect hn       # by type: hn|github|rss|devto|lobsters
+php artisan trends:collect youtube  # by source name when a type has >1 source
 php artisan trends:detect           # cluster ungrouped items + queue scoring
 php artisan trends:score            # re-score all active trends
 php artisan trends:score --trend=95 # score a single trend
+php artisan trends:reclassify --dry-run  # what the word-boundary matcher would change
+php artisan trends:reclassify       # re-sync techs/category on existing trends + re-score
+php artisan ai:check-models         # live-probe every allowlisted AI model
 ```
 
 Normal flow needs none of these — collection auto-chains detection which auto-chains
@@ -77,6 +81,20 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 
 ## 7. Adding a new source (checklist)
 
+**RSS/blog/YouTube feed (no code):**
+
+1. Add `{name, url}` to the right source in `SourceSeeder` — blogs go under
+   `engineering-rss`, videos under `youtube` (YouTube channel RSS:
+   `https://www.youtube.com/feeds/videos.xml?channel_id=UC…`; find the ID via
+   the channel page's `externalId` meta). `media:statistics` views are captured
+   automatically and counted as views ÷ 200 in engagement.
+2. `php artisan db:seed --class=SourceSeeder`
+3. Optional cron line in `routes/console.php` (youtube already runs at `35 */6`)
+4. Test: `php artisan trends:collect <source-name>` then `queue:work --stop-when-empty`;
+   verify rows in `source_items`, second run must insert 0
+
+**New API collector (code):**
+
 1. Create `app/Domain/Trending/Collectors/MyCollector.php` implementing
    `CollectorInterface` → return `Collection<RawItem>`
 2. Add case to `App\Enums\SourceType` (+ value string)
@@ -90,37 +108,48 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 
 | Knob | Where | Effect |
 |---|---|---|
-| Scoring weights | `system_settings` key `scoring.weights.default` | composite formula (hot) |
+| Scoring weights | `system_settings` key `scoring.weights.default` | composite formula (hot); composite is normalized by the sum of positive weights so old sets keep working |
+| Focus topics | `config/trending.php` `focus.*` | which tech slugs / categories earn the `topic_focus` boost (soft, never hides trends) |
+| Hack keywords | `config/trending.php` `hack_keywords` | tips/tricks/hacks phrasing that boosts usefulness + sets the `hack_style` badge |
 | Cluster threshold | `TrendClusterer` ctor default 0.55 | title-merge aggressiveness |
 | Saturation sibling threshold | `SaturationAnalyzer` 0.45 | what counts as duplicate coverage |
 | Source filters (min points/stars/score, windows) | `sources.config` JSON | per-source quality bar |
 | Junk flag thresholds | `TrendClusterer::qualityFlags()` | star-farm detection sensitivity |
-| AI model | `.env` `OPENCODE_GO_MODEL` | allowlist: ox-alpha-free, hy3, mimo-v2.5 |
+| AI model | Settings UI (`system_settings.ai.model`) or `.env` `OPENCODE_GO_MODEL` | allowlist: mimo-v2.5 (default), deepseek-v4-flash, glm-5.3-flash |
 
 ## 8b. OpenCode Go gateway notes
 
 - `OPENCODE_GO_BASE_URL` = **API root** (e.g. `https://opencode.ai/zen/go/v1`).
   The provider appends `/chat/completions`; pasting the full endpoint also works
   (defensively normalized in `OpenCodeGoProvider::apiRoot()`).
+- ⚠️ **`x-opencode-session` header is mandatory** (gateway rule, 2026-09). Without
+  it every model returns `400 MissingSessionID` and the whole AI layer silently
+  fails. The provider sends a stable UUID: `OPENCODE_GO_SESSION_ID` env → or
+  auto-generated once and persisted in `system_settings('ai.session_id')`.
+  If generations suddenly stop with MissingSessionID, check that setting exists.
 - Model output is decoded defensively: direct JSON → markdown-fenced → brace-extracted.
-- **Reasoning models** (hy3, mimo-v2.5) stream chain-of-thought into a separate
-  `reasoning_content` field. If `max_tokens` is exhausted by thinking, `content`
-  arrives EMPTY with `finish_reason=length`. Counters, in order
-  (`OpenCodeGoProvider::completeWithEscalation`):
-    1. Per-model `reasoning_effort` from its profile (hy3 → `none` = direct answers)
-    2. On empty+length: lower effort one step, then double max_tokens (up to ×4)
-    3. Truthful error after ladder exhaustion — never a generic "empty content"
+- **Reasoning models**: all allowlisted models stream chain-of-thought into a
+  separate `reasoning_content` field. `reasoning_effort` rules verified live:
+  `mimo-v2.5` accepts `none`; `deepseek-v4-flash` and `glm-5.3-flash` need `low`
+  (glm rejects `none` with "always engages in thinking", and rejects
+  `max_tokens <= 1024`). Profiles encode this; `max_output` is 8192 for all three.
+  If `max_tokens` is exhausted by thinking, `content` arrives EMPTY with
+  `finish_reason=length`; the provider then doubles the budget once before
+  falling to the next model.
 - Profiles live in `config/ai.php`; model switchable at runtime via Settings.
-- ⚠️ **Go-tier model IDs differ from the public Zen docs table.** Verified live:
-  `ox-alpha-free`, `hy3`, `mimo-v2.5` (docs list `mimo-v2.5-free` / `x-preview-f-free`
-  for the general tier — those 401 on the Go endpoint). Trust only the
-  `on_gateway` flag from `GET /api/settings/models`; unavailable models are
-  disabled in the Settings picker and can't be selected.
-- **Cheapest-first fallback** (`OpenCodeGoProvider::complete`): gateway 5xx /
-  unsupported-model errors walk `fallback_order` from `config/ai.php`
-  (ox-alpha-free → mimo-v2.5 → hy3); empty-content reasoning burn escalates
-  budget once on-model before switching. Every transition lands in the
-  pipeline log; `scripts/verify-ai-fallback.php` replays a simulated outage.
+- **Allowlist (verified 2026-09-12):** `mimo-v2.5` (default), `deepseek-v4-flash`,
+  `glm-5.3-flash`. Removed: `ox-alpha-free` (gateway dropped it),
+  `hy3` (upstream 400). The Go tier's `/models` listing can be broader than what
+  actually answers — **trust `php artisan ai:check-models`**, not the docs table
+  or the `on_gateway` flag alone (which only checks listing membership).
+- **Reliability-ordered fallback** (`OpenCodeGoProvider::complete`): gateway 5xx /
+  unsupported-model / empty-content errors walk `fallback_order` from
+  `config/ai.php` (mimo-v2.5 → deepseek-v4-flash → glm-5.3-flash). All Go-tier
+  calls report `cost: 0`, so the order favors verified reliability, not price.
+  If the stored `ai.model` is no longer allowlisted, the provider logs and
+  self-heals to the config default instead of hard-failing.
+  Every transition lands in the pipeline log; `scripts/verify-ai-fallback.php`
+  replays a simulated outage and asserts the session header is present.
 - Failed AI calls are recorded in `ai_generations` with `status=failed`
   (+ model, duration, error) — check there when generations misbehave.
 - Stale "running" job rows self-heal: `jobs:reconcile-stale` runs every

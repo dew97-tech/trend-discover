@@ -66,6 +66,10 @@ final class RssCollector implements CollectorInterface
 
     private function toRawItem(string $feedName, SimpleXMLElement $entry): RawItem
     {
+        // Register Media RSS so xpath('media:…') never throws "undefined
+        // namespace prefix" on feeds that don't declare it (regular blogs).
+        $entry->registerXPathNamespace('media', 'http://search.yahoo.com/mrss/');
+
         $title = self::text($entry->title) ?: 'Untitled';
 
         $link = self::text($entry->link);
@@ -81,18 +85,29 @@ final class RssCollector implements CollectorInterface
             }
         }
 
+        // Media RSS (YouTube) values need xpath — chained namespaced property
+        // access ($group->community->statistics) silently returns empty.
         $summary = self::text($entry->description)
             ?: self::text($entry->summary)
-            ?: self::text($entry->content);
+            ?: self::text($entry->content)
+            ?: self::xpathText($entry, 'media:group/media:description');
 
         $author = self::text($entry->children('dc', true)->creator)
             ?: self::xpathText($entry, 'author/name')
             ?: self::text($entry->author);
 
-        $publishedRaw = self::text($entry->pubDate) ?: self::text($entry->updated);
+        $publishedRaw = self::text($entry->pubDate)
+            ?: self::text($entry->published)
+            ?: self::text($entry->updated);
         $publishedAt = $publishedRaw !== '' ? Carbon::parse($publishedRaw) : null;
 
         $guid = self::text($entry->guid) ?: self::text($entry->id) ?: $link;
+
+        // YouTube channel feeds expose per-video view counts via media:statistics;
+        // real engagement beats a zero-metric RSS article in momentum scoring.
+        $statistics = $entry->xpath('media:group/media:community/media:statistics');
+        $views = (int) ($statistics !== false ? ($statistics[0]['views'] ?? 0) : 0);
+        $metrics = $views > 0 ? ['views' => $views] : [];
 
         return new RawItem(
             externalId: md5($feedName.'|'.$guid),
@@ -100,7 +115,7 @@ final class RssCollector implements CollectorInterface
             title: sprintf('[%s] %s', $feedName, $title),
             summary: $summary !== '' ? $summary : null,
             author: $author,
-            metrics: [],
+            metrics: $metrics,
             metadata: ['kind' => 'rss_article', 'feed' => $feedName],
             publishedAt: $publishedAt,
         );

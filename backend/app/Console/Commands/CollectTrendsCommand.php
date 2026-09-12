@@ -10,18 +10,27 @@ use Illuminate\Support\Facades\Log;
 
 class CollectTrendsCommand extends Command
 {
-    protected $signature = 'trends:collect {type? : Optional source type filter (hn|github|reddit|devto|rss)}';
+    protected $signature = 'trends:collect {target? : Optional source type (hn|github|devto|rss|lobsters) or source name (e.g. youtube)}';
 
     protected $description = 'Dispatch collection jobs for all enabled trend sources';
 
     public function handle(): int
     {
-        $typeFilter = $this->argument('type');
+        $target = $this->argument('target');
 
         $query = Source::query()->enabled();
 
-        if ($typeFilter !== null) {
-            $query->where('type', SourceType::from($typeFilter));
+        if ($target !== null) {
+            $type = SourceType::tryFrom($target);
+
+            // Types select every source of that kind (rss covers both the
+            // engineering feeds and the YouTube channel feeds); a name that
+            // is not a type selects exactly one source.
+            if ($type !== null) {
+                $query->where('type', $type);
+            } else {
+                $query->where('name', $target);
+            }
         }
 
         $sources = $query->get();

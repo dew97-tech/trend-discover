@@ -45,23 +45,47 @@ class ScoreEngine
             'relevance_score' => DimensionScorers::relevance($trend),
             'usefulness_score' => DimensionScorers::usefulness($trend),
             'novelty_score' => $novelty,
+            'focus_score' => DimensionScorers::focus($trend),
             'saturation_score' => $saturation,
         ];
 
-        $composite =
-            $weights['freshness'] * $dimensions['freshness_score']
-            + $weights['momentum'] * $dimensions['momentum_score']
-            + $weights['technical_relevance'] * $dimensions['relevance_score']
-            + $weights['practical_usefulness'] * $dimensions['usefulness_score']
-            + $weights['novelty'] * $dimensions['novelty_score']
-            + $weights['developer_interest'] * DimensionScorers::interest($trend)
-            + $weights['discussion_potential'] * DimensionScorers::discussion($trend)
-            + $weights['source_reliability'] * DimensionScorers::sourceReliability($trend);
+        // Weighted sum normalized by the weights actually present, so legacy
+        // stored weight sets (sum ≈ 1) and future keys (topic_focus) both
+        // produce a 0–100 composite without rebalancing the settings JSON.
+        $weighted = [
+            'freshness' => $dimensions['freshness_score'],
+            'momentum' => $dimensions['momentum_score'],
+            'technical_relevance' => $dimensions['relevance_score'],
+            'practical_usefulness' => $dimensions['usefulness_score'],
+            'novelty' => $dimensions['novelty_score'],
+            'topic_focus' => $dimensions['focus_score'],
+            'developer_interest' => DimensionScorers::interest($trend),
+            'discussion_potential' => DimensionScorers::discussion($trend),
+            'source_reliability' => DimensionScorers::sourceReliability($trend),
+        ];
+
+        $composite = 0.0;
+        $weightTotal = 0.0;
+
+        foreach ($weighted as $key => $value) {
+            $weight = (float) ($weights[$key] ?? 0);
+            $composite += $weight * $value;
+            $weightTotal += $weight;
+        }
+
+        $composite = $weightTotal > 0.0 ? $composite / $weightTotal : 0.0;
 
         $dimensions['trend_score'] = round(
             max(0.0, min(100.0, $composite - $weights['saturation_penalty_weight'] * $saturation)),
             2,
         );
+
+        // Hack-style badge is derived metadata, not a score input.
+        $trend->metrics = [
+            ...($trend->metrics ?? []),
+            'hack_style' => DimensionScorers::hackHits($trend) >=
+                (int) config('trending.hack_style_min_hits', 2),
+        ];
 
         $trend->forceFill($dimensions)->save();
 
@@ -83,14 +107,15 @@ class ScoreEngine
     private function weights(): array
     {
         $defaults = [
-            'freshness' => 0.18,
-            'momentum' => 0.14,
-            'technical_relevance' => 0.18,
-            'practical_usefulness' => 0.15,
-            'novelty' => 0.20,
+            'freshness' => 0.16,
+            'momentum' => 0.13,
+            'technical_relevance' => 0.16,
+            'practical_usefulness' => 0.14,
+            'novelty' => 0.18,
             'developer_interest' => 0.05,
             'discussion_potential' => 0.05,
             'source_reliability' => 0.05,
+            'topic_focus' => 0.08,
             'saturation_penalty_weight' => 0.25,
         ];
 

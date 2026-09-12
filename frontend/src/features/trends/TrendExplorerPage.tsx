@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, Radar, RefreshCw, X, Sparkles, Loader2 } from 'lucide-react'
+import { Search, Radar, RefreshCw, X, Sparkles, Loader2, Target, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -44,10 +44,21 @@ const SCORE_HELP: Record<string, string> = {
   Freshness: 'How recently this story surfaced — decays over ~1.5 days per halving.',
   Momentum: 'Engagement speed (points/comments per hour since first seen).',
   Relevance: 'Match strength against your technology & category registry.',
-  Usefulness: 'Practical engineering value — heuristics now, AI-judged later.',
+  Usefulness: 'Practical engineering value — hack/tip phrasing gets a boost.',
+  Focus: 'How well this matches your focus topics (Laravel, PHP/TS, React, Next.js, databases). Soft boost only.',
   Novelty: 'How fresh and under-covered the story is. High = not everywhere yet.',
   Saturation: 'How much this topic is already being discussed across sources.',
 }
+
+// Quick topic chips map to the existing technology_id filter.
+const FOCUS_CHIPS = [
+  { slug: 'laravel', label: 'Laravel' },
+  { slug: 'mysql', label: 'MySQL' },
+  { slug: 'react', label: 'React' },
+  { slug: 'next-js', label: 'Next.js' },
+  { slug: 'php', label: 'PHP' },
+  { slug: 'typescript', label: 'TypeScript' },
+]
 
 export function TrendExplorerPage() {
   const [trends, setTrends] = useState<Trend[]>([])
@@ -60,6 +71,8 @@ export function TrendExplorerPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [categoryId, setCategoryId] = useState('all')
+  const [technologyId, setTechnologyId] = useState<string | null>(null)
+  const [focusOnly, setFocusOnly] = useState(false)
   const [minScore, setMinScore] = useState('0')
   const [dateRange, setDateRange] = useState('14')
 
@@ -82,13 +95,15 @@ export function TrendExplorerPage() {
     () => ({
       search: debouncedSearch || undefined,
       category_id: categoryId !== 'all' ? categoryId : undefined,
+      technology_id: technologyId ?? undefined,
+      focus: focusOnly ? '1' : undefined,
       min_trend_score: minScore !== '0' ? minScore : undefined,
       from:
         dateRange !== 'all'
           ? new Date(Date.now() - Number(dateRange) * 86_400_000).toISOString()
           : undefined,
     }),
-    [debouncedSearch, categoryId, minScore, dateRange],
+    [debouncedSearch, categoryId, technologyId, focusOnly, minScore, dateRange],
   )
 
   const load = useCallback(() => {
@@ -223,6 +238,35 @@ export function TrendExplorerPage() {
         </Select>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={focusOnly ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFocusOnly((v) => !v)}
+          title="Only show trends matching your focus topics (Laravel, PHP/TS, React, Next.js, databases)"
+        >
+          <Target className="size-3.5" />
+          Focus topics
+        </Button>
+        {FOCUS_CHIPS.map((chip) => {
+          const tech = taxonomy?.technologies.find((t) => t.slug === chip.slug)
+          if (!tech) return null
+          const active = technologyId === String(tech.id)
+
+          return (
+            <Button
+              key={chip.slug}
+              variant={active ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setTechnologyId(active ? null : String(tech.id))}
+            >
+              {chip.label}
+            </Button>
+          )
+        })}
+      </div>
+
       {error ? (
         <div className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>
       ) : null}
@@ -251,16 +295,22 @@ export function TrendExplorerPage() {
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
-                      {trend.category ? (
-                        <Badge variant="secondary" className="text-xs">
-                          {trend.category.name}
-                        </Badge>
-                      ) : (
-                        <span />
-                      )}
+                      <div className="flex min-w-0 flex-wrap items-center gap-1">
+                        {trend.category ? (
+                          <Badge variant="secondary" className="text-xs">
+                            {trend.category.name}
+                          </Badge>
+                        ) : null}
+                        {trend.hack_style ? (
+                          <Badge variant="outline" className="gap-1 px-1.5 text-[10px] text-primary">
+                            <Wrench className="size-3" />
+                            hack
+                          </Badge>
+                        ) : null}
+                      </div>
                       <span
                         className={cn(
-                          'rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
+                          'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
                           SCORE_TIERS[tier],
                         )}
                       >
@@ -324,7 +374,8 @@ export function TrendExplorerPage() {
                 </div>
                 <DialogDescription className="text-left">
                   {selected.category?.name ?? 'Uncategorized'} · {selected.item_count} signal
-                  {selected.item_count === 1 ? '' : 's'} · first seen{' '}
+                  {selected.item_count === 1 ? '' : 's'}
+                  {selected.hack_style ? ' · hack-style' : ''} · first seen{' '}
                   {selected.first_seen_at
                     ? new Date(selected.first_seen_at).toLocaleDateString()
                     : '—'}
@@ -348,6 +399,7 @@ export function TrendExplorerPage() {
                     Momentum: selected.scores.momentum,
                     Relevance: selected.scores.relevance,
                     Usefulness: selected.scores.usefulness,
+                    Focus: selected.scores.focus ?? 0,
                     Novelty: selected.scores.novelty,
                     Saturation: selected.scores.saturation,
                   }).map(([label, value]) => (

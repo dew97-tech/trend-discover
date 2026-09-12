@@ -40,6 +40,18 @@ class TrendRepository implements TrendRepositoryInterface
                 fn ($q, $score) => $q->where('saturation_score', '<=', $score),
             )
             ->when(
+                $filters['focus'] ?? null,
+                fn ($q) => $q->where(function ($q) {
+                    $q->whereHas('technologies', fn ($t) => $t->whereIn(
+                        'technologies.slug',
+                        config('trending.focus.technology_slugs', []),
+                    ))->orWhereHas('category', fn ($c) => $c->whereIn(
+                        'categories.slug',
+                        config('trending.focus.category_slugs', []),
+                    ));
+                }),
+            )
+            ->when(
                 $filters['from'] ?? null,
                 fn ($q, $from) => $q->where('first_seen_at', '>=', Carbon::parse($from)),
             )

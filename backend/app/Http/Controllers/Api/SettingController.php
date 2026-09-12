@@ -14,6 +14,7 @@ class SettingController extends Controller
     private const WEIGHT_KEYS = [
         'freshness', 'momentum', 'technical_relevance', 'practical_usefulness',
         'novelty', 'developer_interest', 'discussion_potential', 'source_reliability',
+        'topic_focus',
     ];
 
     public function __construct(private readonly \App\Services\AI\PromptRegistry $prompts) {}
@@ -21,7 +22,9 @@ class SettingController extends Controller
     public function index(): JsonResponse
     {
         return response()->json([
-            'weights' => SystemSetting::get('scoring.weights.default', []),
+            // Merged through WEIGHT_KEYS so non-dimension keys stored in the
+            // JSON (e.g. legacy min_ranking_score) never reach the UI sliders.
+            'weights' => $this->mergeWeights(SystemSetting::get('scoring.weights.default', []) ?? []),
             'limits' => SystemSetting::get('generation.limits', []),
             'model' => SystemSetting::get('ai.model', config('ai.providers.opencode_go.model')),
             'allowed_models' => config('ai.providers.opencode_go.allowed_models'),

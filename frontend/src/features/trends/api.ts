@@ -7,6 +7,7 @@ export interface TrendFilters {
   technology_id?: string
   status?: string
   min_trend_score?: string
+  focus?: string
   from?: string
 }
 

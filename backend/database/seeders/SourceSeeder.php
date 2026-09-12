@@ -30,8 +30,8 @@ class SourceSeeder extends Seeder
                 'config' => [
                     'trending_window_days' => 7,
                     'min_stars' => 150,
-                    'watched_topics' => ['laravel', 'react', 'typescript', 'devops', 'database', 'performance'],
-                    'release_repos' => ['laravel/framework', 'facebook/react', 'microsoft/TypeScript', 'php/php-src'],
+                    'watched_topics' => ['laravel', 'react', 'nextjs', 'typescript', 'php', 'mysql', 'database', 'performance'],
+                    'release_repos' => ['laravel/framework', 'facebook/react', 'vercel/next.js', 'microsoft/TypeScript', 'php/php-src'],
                     'rate_limit_per_hour' => 60,
                 ],
             ],
@@ -52,7 +52,7 @@ class SourceSeeder extends Seeder
                 'type' => SourceType::DevTo,
                 'base_url' => 'https://dev.to/api',
                 'config' => [
-                    'tags' => ['php', 'laravel', 'javascript', 'typescript', 'react', 'devops', 'sql', 'performance'],
+                    'tags' => ['php', 'laravel', 'javascript', 'typescript', 'react', 'nextjs', 'sql', 'mysql', 'database', 'performance'],
                     // Public API ignores sort-by-popularity params, so this
                     // source contributes FRESH niche articles; popularity
                     // signals come from HN/Lobsters/GitHub.
@@ -67,10 +67,32 @@ class SourceSeeder extends Seeder
                 'config' => [
                     'feeds' => [
                         ['name' => 'Laravel News', 'url' => 'https://laravel-news.com/feed'],
+                        ['name' => 'Laravel Daily', 'url' => 'https://laraveldaily.com/feed'],
+                        ['name' => 'Laracasts', 'url' => 'https://laracasts.com/feed'],
+                        ['name' => 'Next.js Blog', 'url' => 'https://nextjs.org/feed.xml'],
+                        ['name' => 'React Blog', 'url' => 'https://react.dev/rss.xml'],
+                        ['name' => 'Vercel Blog', 'url' => 'https://vercel.com/atom'],
+                        ['name' => 'Percona MySQL', 'url' => 'https://www.percona.com/blog/feed/'],
+                        ['name' => 'PlanetScale', 'url' => 'https://planetscale.com/blog/feed.atom'],
                         ['name' => 'InfoQ Engineering', 'url' => 'https://feed.infoq.com/'],
                         ['name' => 'Smashing Magazine', 'url' => 'https://www.smashingmagazine.com/feed/'],
                     ],
                     'items_per_feed' => 25,
+                ],
+            ],
+            [
+                'name' => 'youtube',
+                'type' => SourceType::Rss,
+                'base_url' => null,
+                'config' => [
+                    // Channel RSS feeds — no API key. Entries carry
+                    // media:statistics views which the RSS collector maps
+                    // into engagement metrics (views ÷ 200).
+                    'feeds' => [
+                        ['name' => 'KodeKloud', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCSWj8mqQCcrcBlXPi4ThRDQ'],
+                        ['name' => 'Laravel Daily Video', 'url' => 'https://www.youtube.com/feeds/videos.xml?channel_id=UCTuplgOBi6tJIlesIboymGA'],
+                    ],
+                    'items_per_feed' => 15,
                 ],
             ],
         ];

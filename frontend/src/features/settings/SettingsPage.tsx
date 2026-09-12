@@ -25,6 +25,7 @@ const WEIGHT_LABELS: Array<[string, string]> = [
   ['technical_relevance', 'Technical Relevance'],
   ['practical_usefulness', 'Practical Usefulness'],
   ['novelty', 'Novelty'],
+  ['topic_focus', 'Topic Focus (soft boost)'],
   ['developer_interest', 'Developer Interest'],
   ['discussion_potential', 'Discussion Potential'],
   ['source_reliability', 'Source Reliability'],

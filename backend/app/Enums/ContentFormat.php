@@ -4,6 +4,11 @@ namespace App\Enums;
 
 enum ContentFormat: string
 {
+    case QuickTip = 'quick_tip';
+    case SqlHack = 'sql_hack';
+    case LaravelHack = 'laravel_hack';
+    case ReactHack = 'react_hack';
+    case NextJsHack = 'nextjs_hack';
     case TechnicalInsight = 'technical_insight';
     case OptimizationTip = 'optimization_tip';
     case ProblemSolution = 'problem_solution';
@@ -20,6 +25,11 @@ enum ContentFormat: string
     public function label(): string
     {
         return match ($this) {
+            self::QuickTip => 'Quick Tip',
+            self::SqlHack => 'SQL Hack',
+            self::LaravelHack => 'Laravel Hack',
+            self::ReactHack => 'React Hack',
+            self::NextJsHack => 'Next.js Hack',
             self::TechnicalInsight => 'Technical Insight',
             self::OptimizationTip => 'Optimization Tip',
             self::ProblemSolution => 'Problem → Solution',

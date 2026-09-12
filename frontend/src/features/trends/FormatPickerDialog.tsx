@@ -21,6 +21,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { generatePost, type GenerateSpec } from './api'
 
 export const POST_FORMATS: Array<{ value: string; label: string }> = [
+  { value: 'quick_tip', label: 'Quick Tip' },
+  { value: 'laravel_hack', label: 'Laravel Hack' },
+  { value: 'sql_hack', label: 'SQL Hack' },
+  { value: 'react_hack', label: 'React Hack' },
+  { value: 'nextjs_hack', label: 'Next.js Hack' },
   { value: 'technical_insight', label: 'Technical Insight' },
   { value: 'optimization_tip', label: 'Optimization Tip' },
   { value: 'problem_solution', label: 'Problem → Solution' },

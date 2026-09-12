@@ -21,6 +21,7 @@ class TrendFilterRequest extends FormRequest
             'min_trend_score' => ['nullable', 'numeric', 'between:0,100'],
             'min_novelty_score' => ['nullable', 'numeric', 'between:0,100'],
             'max_saturation' => ['nullable', 'numeric', 'between:0,100'],
+            'focus' => ['nullable', 'boolean'],
             'from' => ['nullable', 'date'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:50'],
             'cursor' => ['nullable', 'string'],
@@ -37,6 +38,7 @@ class TrendFilterRequest extends FormRequest
             'min_trend_score',
             'min_novelty_score',
             'max_saturation',
+            'focus',
             'from',
         ]);
     }

@@ -5,6 +5,7 @@ export interface TrendScores {
   momentum: number
   relevance: number
   usefulness: number
+  focus?: number
   saturation: number
 }
 
@@ -16,6 +17,7 @@ export interface Trend {
   category?: { id: number; name: string; slug: string } | null
   technologies?: Array<{ id: number; name: string; slug: string }>
   scores: TrendScores
+  hack_style?: boolean
   item_count: number
   has_post?: boolean | null
   first_seen_at: string | null
