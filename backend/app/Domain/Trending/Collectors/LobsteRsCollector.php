@@ -7,6 +7,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Lobste.rs — open developer link/discussion aggregator.
@@ -27,22 +28,37 @@ final class LobsteRsCollector implements CollectorInterface
 
         $cutoff = now()->subHours($windowHours);
 
-        return collect(range(1, $pages))
-            ->flatMap(function (int $page) use ($baseUrl, $listing) {
-                $path = $page === 1 ? "/{$listing}.json" : "/{$listing}/page/{$page}.json";
+        $stories = collect();
 
-                $response = Http::baseUrl($baseUrl)
-                    ->timeout(20)
-                    ->withUserAgent('trend-discover/1.0 (local research tool)')
-                    ->retry(2, 1000, throw: false)
-                    ->get($path);
+        for ($page = 1; $page <= $pages; $page++) {
+            $path = $page === 1 ? "/{$listing}.json" : "/{$listing}/page/{$page}.json";
 
-                if ($response->failed()) {
+            $response = Http::baseUrl($baseUrl)
+                ->timeout(20)
+                ->withUserAgent('trend-discover/1.0 (local research tool)')
+                ->retry(2, 1000, throw: false)
+                ->get($path);
+
+            if ($response->failed()) {
+                // /hottest.json is single-page: a 404 on page 2+ means
+                // pagination ended, not that the whole source is down.
+                if ($page === 1) {
                     throw new ConnectionException("Lobste.rs {$listing} page {$page} failed: {$response->status()}");
                 }
 
-                return collect($response->json());
-            })
+                Log::channel('pipeline')->info('[LobsteRsCollector] pagination ended', [
+                    'listing' => $listing,
+                    'page' => $page,
+                    'status' => $response->status(),
+                ]);
+
+                break;
+            }
+
+            $stories = $stories->merge($response->json());
+        }
+
+        return $stories
             ->filter(fn (array $story) => ($story['score'] ?? 0) >= $minScore)
             ->filter(fn (array $story) => filled($story['title'] ?? null))
             ->filter(function (array $story) use ($cutoff) {

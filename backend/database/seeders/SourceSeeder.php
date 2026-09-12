@@ -40,8 +40,9 @@ class SourceSeeder extends Seeder
                 'type' => SourceType::LobsteRs,
                 'base_url' => 'https://lobste.rs',
                 'config' => [
+                    // /hottest.json is single-page; pagination attempts 404.
                     'listing' => 'hottest',
-                    'pages' => 2,
+                    'pages' => 1,
                     'min_score' => 15,
                     'window_hours' => 72,
                     'rate_limit_per_minute' => 10,
