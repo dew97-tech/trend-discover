@@ -1,3 +1,5 @@
+export { scoreTier, type ScoreTier } from '@/lib/scores'
+
 export interface TrendScores {
   trend: number
   novelty: number
@@ -22,10 +24,4 @@ export interface Trend {
   has_post?: boolean | null
   first_seen_at: string | null
   last_seen_at: string | null
-}
-
-export function scoreTier(score: number): 'high' | 'medium' | 'low' {
-  if (score >= 75) return 'high'
-  if (score >= 55) return 'medium'
-  return 'low'
 }

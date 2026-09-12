@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -18,33 +18,31 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { HelpTip } from '@/components/shared/HelpTip'
+import { CONTENT_FORMATS, contentFormatDescription, contentFormatLabel } from '@/lib/content-formats'
 import { generatePost, type GenerateSpec } from './api'
 
-export const POST_FORMATS: Array<{ value: string; label: string }> = [
-  { value: 'quick_tip', label: 'Quick Tip' },
-  { value: 'laravel_hack', label: 'Laravel Hack' },
-  { value: 'sql_hack', label: 'SQL Hack' },
-  { value: 'react_hack', label: 'React Hack' },
-  { value: 'nextjs_hack', label: 'Next.js Hack' },
-  { value: 'technical_insight', label: 'Technical Insight' },
-  { value: 'optimization_tip', label: 'Optimization Tip' },
-  { value: 'problem_solution', label: 'Problem → Solution' },
-  { value: 'before_after', label: 'Before → After' },
-  { value: 'engineering_lesson', label: 'Engineering Lesson' },
-  { value: 'release_highlight', label: 'Release Highlight' },
-  { value: 'tool_discovery', label: 'Tool Discovery' },
-  { value: 'performance_breakdown', label: 'Performance Breakdown' },
-  { value: 'architecture_insight', label: 'Architecture Insight' },
-  { value: 'debugging_story', label: 'Debugging Story' },
-  { value: 'developer_debate', label: 'Developer Debate' },
-  { value: 'case_study', label: 'Case Study' },
-]
-
-const TONES = [
-  { value: 'technical', label: 'Technical' },
-  { value: 'conversational', label: 'Conversational' },
-  { value: 'storytelling', label: 'Storytelling' },
-  { value: 'contrarian', label: 'Contrarian' },
+const TONES: Array<{ value: string; label: string; description: string }> = [
+  {
+    value: 'technical',
+    label: 'Technical',
+    description: 'Precise, code-forward, no fluff. The default for engineer audiences.',
+  },
+  {
+    value: 'conversational',
+    label: 'Conversational',
+    description: 'Relaxed first-person voice, as if explaining to a colleague over coffee.',
+  },
+  {
+    value: 'storytelling',
+    label: 'Storytelling',
+    description: 'Narrative arc — situation, problem, resolution. Good for lessons learned.',
+  },
+  {
+    value: 'contrarian',
+    label: 'Contrarian',
+    description: 'Challenges a common assumption, then defends the position honestly.',
+  },
 ]
 
 interface Props {
@@ -52,13 +50,30 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onQueued?: () => void
+  /** Formats already generated for this trend — shows a duplicate hint. */
+  existingFormats?: string[]
 }
 
-export function FormatPickerDialog({ trendId, open, onOpenChange, onQueued }: Props) {
-  const [format, setFormat] = useState('technical_insight')
+export function FormatPickerDialog({
+  trendId,
+  open,
+  onOpenChange,
+  onQueued,
+  existingFormats = [],
+}: Props) {
+  const [format, setFormat] = useState('quick_tip')
   const [tone, setTone] = useState('technical')
   const [angle, setAngle] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setAngle('')
+      setSubmitting(false)
+    }
+  }, [open])
+
+  const duplicate = existingFormats.includes(format)
 
   function handleGenerate() {
     setSubmitting(true)
@@ -68,7 +83,7 @@ export function FormatPickerDialog({ trendId, open, onOpenChange, onQueued }: Pr
 
     generatePost(trendId, spec)
       .then(() => {
-        toast.success('Generation queued — the post will appear in Post Studio shortly.')
+        toast.success('Generation queued — it will appear in Studio shortly.')
         onOpenChange(false)
         onQueued?.()
       })
@@ -82,34 +97,51 @@ export function FormatPickerDialog({ trendId, open, onOpenChange, onQueued }: Pr
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Sparkles className="size-4 text-primary" />
-            Generate LinkedIn post
+            Generate a variant
           </DialogTitle>
           <DialogDescription>
-            Pick a format and tone. Research runs automatically from this trend's signals.
+            One post per format + tone + angle. Research runs automatically from this trend's
+            signals.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Format</Label>
+            <div className="flex items-center gap-1.5">
+              <Label>Format</Label>
+              <HelpTip text="The content shape the post takes. Hack formats are the practical, tutorial-style core of this tool." />
+            </div>
             <Select value={format} onValueChange={setFormat}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-72">
-                {POST_FORMATS.map((f) => (
+                {CONTENT_FORMATS.map((f) => (
                   <SelectItem key={f.value} value={f.value}>
                     {f.label}
+                    {existingFormats.includes(f.value) ? (
+                      <span className="text-muted-foreground"> · used</span>
+                    ) : null}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">{contentFormatDescription(format)}</p>
+            {duplicate ? (
+              <p className="text-xs text-warning">
+                A {contentFormatLabel(format)} variant already exists for this trend — generating
+                again creates another one you can compare and delete.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">
-            <Label>Tone</Label>
+            <div className="flex items-center gap-1.5">
+              <Label>Tone</Label>
+              <HelpTip text="Voice of the post. Keep one tone per variant so comparisons stay honest." />
+            </div>
             <Select value={tone} onValueChange={setTone}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -120,23 +152,30 @@ export function FormatPickerDialog({ trendId, open, onOpenChange, onQueued }: Pr
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {TONES.find((t) => t.value === tone)?.description}
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label>
-              Angle <span className="text-muted-foreground">(optional)</span>
-            </Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="generate-angle">
+                Angle <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <HelpTip text="Steers the draft — e.g. “focus on the migration path” or “compare with PostgreSQL”. Part of the variant identity." />
+            </div>
             <Textarea
+              id="generate-angle"
               value={angle}
               onChange={(e) => setAngle(e.target.value)}
-              placeholder="Steer the post — e.g. “focus on supply-chain security”"
+              placeholder="e.g. focus on the N+1 query fix"
               rows={3}
             />
           </div>
 
           <Button onClick={handleGenerate} disabled={submitting} className="w-full">
             {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-            Generate
+            Generate variant
           </Button>
         </div>
       </DialogContent>

@@ -8,6 +8,7 @@ use App\Models\SystemSetting;
 use App\Models\Trend;
 use App\Repositories\Contracts\ContentPostRepositoryInterface;
 use App\Services\AI\Concerns\LogsAiGenerations;
+use App\Support\Hashtags;
 
 class PostGenerationService
 {
@@ -77,12 +78,14 @@ class PostGenerationService
         }
 
         $data = $response->data;
+        $hashtags = Hashtags::sanitize($data['hashtags'] ?? []);
 
         $post = $this->posts->createWithVersion([
             'trend_id' => $trend->id,
             'title' => str((string) ($data['title'] ?? $trend->title))->limit(255)->toString(),
             'hook' => str((string) ($data['hook'] ?? ''))->limit(500)->toString(),
             'body' => (string) ($data['body'] ?? ''),
+            'hashtags' => $hashtags === [] ? null : $hashtags,
             'format' => $spec->format,
             'tone' => $spec->tone,
             'angle' => $spec->angle,

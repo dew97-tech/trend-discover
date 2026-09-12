@@ -17,6 +17,8 @@ class UpdatePostRequest extends FormRequest
             'title' => ['sometimes', 'string', 'max:255'],
             'hook' => ['sometimes', 'nullable', 'string', 'max:500'],
             'body' => ['required', 'string', 'min:50', 'max:5000'],
+            'hashtags' => ['sometimes', 'array', 'max:8'],
+            'hashtags.*' => ['string', 'max:30'],
         ];
     }
 }

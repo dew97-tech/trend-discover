@@ -89,6 +89,8 @@ export interface ContentPost {
   body: string
   format: string
   tone: string
+  angle?: string | null
+  hashtags?: string[] | null
   status: string
   quality_score: number | null
   quality_breakdown: {
@@ -98,6 +100,54 @@ export interface ContentPost {
   word_count: number | null
   version_count?: number
   generated_at: string | null
+  updated_at?: string | null
+}
+
+export interface PostGroup {
+  trend: {
+    id: number
+    title: string
+    category: { id: number; name: string; slug: string } | null
+    trend_score: number
+    focus_score: number
+    hack_style: boolean
+    deleted: boolean
+  }
+  post_count: number
+  latest_at: string | null
+  posts: ContentPost[]
+}
+
+export interface GroupedPostsFilters {
+  status?: string
+  format?: string
+  search?: string
+}
+
+/** Posts grouped under their trend — powers the Studio working view. */
+export function fetchGroupedPosts(
+  filters: GroupedPostsFilters = {},
+  cursor?: string | null,
+): Promise<{ data: PostGroup[]; next_cursor: string | null }> {
+  const params = new URLSearchParams()
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value)
+  })
+
+  params.set('per_page', '10')
+
+  if (cursor) params.set('cursor', cursor)
+
+  return api(`/posts/grouped?${params.toString()}`)
+}
+
+export function deletePost(id: number): Promise<{ message: string }> {
+  return api(`/posts/${id}`, { method: 'DELETE' })
+}
+
+export function deleteTrendPosts(trendId: number): Promise<{ message: string; deleted: number }> {
+  return api(`/posts?trend_id=${trendId}`, { method: 'DELETE' })
 }
 
 export function generatePost(trendId: number, spec: GenerateSpec): Promise<{ message: string }> {
@@ -153,12 +203,15 @@ export interface PaginatedPosts {
 
 export function fetchPosts(filters: ContentPostFilters = {}): Promise<PaginatedPosts> {
   const params = new URLSearchParams()
+  const { per_page, cursor, ...rest } = filters
 
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value) params.set(key === 'cursor' ? 'cursor' : `filter[${key}]`, value)
+  Object.entries(rest).forEach(([key, value]) => {
+    if (value) params.set(`filter[${key}]`, value)
   })
 
-  if (!filters.cursor) params.set('per_page', '12')
+  params.set('per_page', per_page ?? '12')
+
+  if (cursor) params.set('cursor', cursor)
 
   return api<PaginatedPosts>(`/posts?${params.toString()}`)
 }
@@ -169,11 +222,16 @@ export function fetchPost(id: number): Promise<{ data: ContentPost }> {
 
 export function patchPost(
   id: number,
-  changes: { title?: string; hook?: string; body: string },
+  changes: { title?: string; hook?: string; body: string; hashtags?: string[] },
 ): Promise<{ data: ContentPost }> {
   return api(`/posts/${id}`, { method: 'PATCH', body: changes })
 }
 
 export function regeneratePost(id: number): Promise<{ message: string }> {
   return api(`/posts/${id}/regenerate`, { method: 'POST' })
+}
+
+/** Queues AI hashtag selection for a post (async — poll the post afterwards). */
+export function generatePostHashtags(id: number): Promise<{ message: string }> {
+  return api(`/posts/${id}/hashtags`, { method: 'POST' })
 }

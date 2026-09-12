@@ -1,24 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 import {
   ClipboardCheck,
   PenLine,
   Send,
   Sparkles,
   TrendingUp,
+  TriangleAlert,
   Zap,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { HelpTip } from '@/components/shared/HelpTip'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { PostCard } from '@/components/shared/PostCard'
+import { ScorePill } from '@/components/shared/ScorePill'
+import { SectionHeader } from '@/components/shared/SectionHeader'
+import { StatTile } from '@/components/shared/StatTile'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { contentFormatLabel } from '@/lib/content-formats'
 import { api } from '@/lib/api'
 import { FormatPickerDialog } from '@/features/trends/FormatPickerDialog'
 import type { Trend } from '@/features/trends/types'
-import { scoreTier } from '@/features/trends/types'
-import { PostCard } from '@/components/shared/PostCard'
-import { cn } from '@/lib/utils'
 
 interface DashboardData {
   new_trends: number
@@ -43,30 +49,53 @@ interface DashboardData {
   }>
 }
 
-const stats = [
-  { key: 'new_trends', label: 'New Trends', icon: TrendingUp },
-  { key: 'high_potential', label: 'High Potential', icon: Sparkles },
-  { key: 'generated_posts', label: 'Generated Posts', icon: PenLine },
-  { key: 'pending_review', label: 'Pending Review', icon: ClipboardCheck },
-  { key: 'published', label: 'Published', icon: Send },
-] as const
-
-const TIER_STYLES = {
-  high: 'bg-success-soft text-success',
-  medium: 'bg-warning-soft text-warning',
-  low: 'bg-surface-muted text-muted-foreground',
-} as const
+const STATS: Array<{
+  key: keyof DashboardData
+  label: string
+  icon: typeof TrendingUp
+  help: string
+}> = [
+  {
+    key: 'new_trends',
+    label: 'New trends',
+    icon: TrendingUp,
+    help: 'Trends discovered in the current collection window.',
+  },
+  {
+    key: 'high_potential',
+    label: 'High potential',
+    icon: Sparkles,
+    help: 'Active trends scoring 75 or higher — your best posting candidates.',
+  },
+  {
+    key: 'generated_posts',
+    label: 'Generated posts',
+    icon: PenLine,
+    help: 'Every draft, variant and published post in the workspace.',
+  },
+  {
+    key: 'pending_review',
+    label: 'Pending review',
+    icon: ClipboardCheck,
+    help: 'Posts in Review or Ready state waiting on your decision.',
+  },
+  {
+    key: 'published',
+    label: 'Published',
+    icon: Send,
+    help: 'Posts you marked as published on LinkedIn.',
+  },
+]
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [pickerTrend, setPickerTrend] = useState<Trend | null>(null)
   const navigate = useNavigate()
 
   const load = useCallback(() => {
     api<DashboardData>('/dashboard')
       .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load dashboard'))
+      .catch(() => toast.error('Failed to load the overview.'))
   }, [])
 
   useEffect(() => {
@@ -76,74 +105,73 @@ export function DashboardPage() {
   }, [load])
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Today's Intelligence</h1>
-        <p className="text-sm text-muted-foreground">
-          Software engineering trends worth posting about — updated continuously.
-        </p>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-7 p-6">
+      <PageHeader
+        title="Overview"
+        description="Software engineering trends worth posting about — refreshed continuously."
+      />
 
-      {error ? (
-        <div className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>
+      {data && data.failed_jobs_24h > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning">
+          <TriangleAlert className="size-4 shrink-0" />
+          <span>
+            {data.failed_jobs_24h} pipeline job{data.failed_jobs_24h === 1 ? '' : 's'} failed in the
+            last 24 hours.
+          </span>
+          <Button asChild variant="outline" size="xs" className="ml-auto">
+            <Link to="/jobs">Open Jobs</Link>
+          </Button>
+        </div>
       ) : null}
 
-      {/* Stats row */}
+      {/* Stats */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {stats.map(({ key, label, icon: Icon }) => (
-          <Card key={key}>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Icon className="size-3.5" />
-                {label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data ? (
-                <span className="text-2xl font-semibold tabular-nums">{data[key]}</span>
-              ) : (
-                <Skeleton className="h-7 w-12" />
-              )}
-            </CardContent>
-          </Card>
+        {STATS.map(({ key, label, icon, help }) => (
+          <StatTile
+            key={key}
+            label={label}
+            icon={icon}
+            help={help}
+            value={data ? (data[key] as number) : null}
+          />
         ))}
       </section>
 
-      {/* Recommended Topics — action list */}
+      {/* Recommended topics */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Zap className="size-4 text-primary" />
-            Recommended Topics
-          </h2>
-          {data && data.recommended.length > 0 ? (
-            <span className="text-xs text-muted-foreground">top ranked</span>
-          ) : null}
-        </div>
+        <SectionHeader
+          title="Recommended topics"
+          help={
+            <HelpTip text="Top-ranked trends by composite score. Prefer low saturation and high novelty — those are the stories not already everywhere on LinkedIn." />
+          }
+          actions={
+            <Button asChild variant="ghost" size="xs">
+              <Link to="/trends">Explore all</Link>
+            </Button>
+          }
+        />
 
         {!data ? (
-          <Skeleton className="h-40 rounded-lg" />
+          <Skeleton className="h-44 rounded-lg" />
         ) : data.recommended.length === 0 ? (
-          <EmptyHint text="Run a collection to populate recommendations." />
+          <EmptyState
+            icon={Zap}
+            title="No recommendations yet"
+            description="Run a collection to populate this list."
+          />
         ) : (
           <Card>
             <CardContent className="divide-y p-0">
               {data.recommended.map((trend) => (
                 <div key={trend.id} className="flex items-center gap-3 px-4 py-3">
-                  <span
-                    className={cn(
-                      'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
-                      TIER_STYLES[scoreTier(trend.scores.trend)],
-                    )}
-                  >
-                    {Math.round(trend.scores.trend)}
-                  </span>
+                  <ScorePill score={trend.scores.trend} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{trend.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {trend.category?.name ?? 'Uncategorized'} · novelty{' '}
-                      {Math.round(trend.scores.novelty)} · sat {Math.round(trend.scores.saturation)}
-                      {trend.has_post ? ' · post exists ✓' : ''}
+                      {Math.round(trend.scores.novelty)}
+                      {trend.hack_style ? ' · hack' : ''}
+                      {trend.has_post ? ' · variant exists' : ''}
                     </p>
                   </div>
                   <Button
@@ -151,7 +179,8 @@ export function DashboardPage() {
                     variant={trend.has_post ? 'outline' : 'default'}
                     onClick={() => setPickerTrend(trend)}
                   >
-                    Generate Post
+                    <Sparkles className="size-3.5" />
+                    Generate
                   </Button>
                 </div>
               ))}
@@ -160,86 +189,85 @@ export function DashboardPage() {
         )}
       </section>
 
-      {/* Trending Now */}
+      {/* Trending now */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Trending Now
-          </h2>
-          {data && data.recent_items_7d > 0 ? (
-            <Link to="/trends" className="text-xs text-primary hover:underline">
-              Explore all →
-            </Link>
-          ) : null}
-        </div>
+        <SectionHeader
+          title="Trending now"
+          help={
+            <HelpTip text="Highest-scoring active trends across all sources. Focus topics and hack-style content get a ranking boost." />
+          }
+          actions={
+            data && data.recent_items_7d > 0 ? (
+              <Button asChild variant="ghost" size="xs">
+                <Link to="/trends">Explore all</Link>
+              </Button>
+            ) : null
+          }
+        />
 
         {!data ? (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-36 rounded-lg" />
+              <Skeleton key={i} className="h-32 rounded-lg" />
             ))}
           </div>
         ) : data.trending_now.length === 0 ? (
-          <EmptyHint text="No scored trends yet — collectors are still warming up." />
+          <EmptyState
+            icon={TrendingUp}
+            title="No scored trends yet"
+            description="Collectors are still warming up."
+          />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {data.trending_now.map((trend) => {
-              const tier = scoreTier(trend.scores.trend)
-
-              return (
-                <Card
-                  key={trend.id}
-                  onClick={() => navigate('/trends')}
-                  className="cursor-pointer transition-shadow hover:shadow-md"
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      {trend.category ? (
-                        <Badge variant="secondary" className="text-xs">
-                          {trend.category.name}
-                        </Badge>
-                      ) : (
-                        <span />
-                      )}
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
-                          TIER_STYLES[tier],
-                        )}
-                      >
-                        {Math.round(trend.scores.trend)}
-                      </span>
-                    </div>
-                    <p className="line-clamp-2 pt-1 text-sm leading-snug">{trend.title}</p>
-                  </CardHeader>
-                  <CardContent className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{trend.item_count} signal{trend.item_count === 1 ? '' : 's'}</span>
-                    ·<span>novelty {Math.round(trend.scores.novelty)}</span>
-                  </CardContent>
-                </Card>
-              )
-            })}
+            {data.trending_now.map((trend) => (
+              <Card
+                key={trend.id}
+                onClick={() => navigate('/trends')}
+                className="cursor-pointer transition-colors hover:border-primary/40"
+              >
+                <CardContent className="space-y-2 pt-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {trend.category?.name ?? 'Uncategorized'}
+                    </span>
+                    <ScorePill score={trend.scores.trend} />
+                  </div>
+                  <p className="line-clamp-2 text-sm font-medium leading-snug">{trend.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {trend.item_count} signal{trend.item_count === 1 ? '' : 's'} · novelty{' '}
+                    {Math.round(trend.scores.novelty)}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </section>
 
-      {/* Publishing Queue */}
+      {/* Publishing queue */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Publishing Queue
-          </h2>
-          {data && data.queue_count > 0 ? (
-            <Link to="/library" className="text-xs text-primary hover:underline">
-              Open library →
-            </Link>
-          ) : null}
-        </div>
+        <SectionHeader
+          title="Publishing queue"
+          help={
+            <HelpTip text="Posts the quality gate routed to Review or Ready. Open one, polish it, then copy it into LinkedIn." />
+          }
+          actions={
+            data && data.queue_count > 0 ? (
+              <Button asChild variant="ghost" size="xs">
+                <Link to="/library">Open Library</Link>
+              </Button>
+            ) : null
+          }
+        />
 
         {!data ? (
           <Skeleton className="h-24 rounded-lg" />
         ) : data.queue_count === 0 ? (
-          <EmptyHint text="Nothing waiting for review or publishing." />
+          <EmptyState
+            icon={ClipboardCheck}
+            title="Nothing waiting"
+            description="Posts routed to Review or Ready will appear here."
+          />
         ) : (
           <Card>
             <CardContent className="divide-y p-0">
@@ -251,17 +279,17 @@ export function DashboardPage() {
                     key={post.id}
                     type="button"
                     onClick={() => navigate(`/studio/${post.id}`)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-muted"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted"
                   >
-                    <PostStatusPill status={post.status} />
+                    <StatusBadge status={post.status} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm">{(post.hook ?? post.title) || '(untitled)'}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {post.format.replaceAll('_', ' ')}
+                      <p className="text-xs text-muted-foreground">
+                        {contentFormatLabel(post.format)}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                      Q{post.quality_score !== null ? Math.round(post.quality_score) : '—'}
+                      Quality {post.quality_score !== null ? Math.round(post.quality_score) : '—'}
                     </span>
                   </button>
                 ))}
@@ -270,23 +298,27 @@ export function DashboardPage() {
         )}
       </section>
 
-      {/* Recent Content */}
+      {/* Recent content */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Recent Content
-          </h2>
-          {data && data.generated_posts > 0 ? (
-            <Link to="/studio" className="text-xs text-primary hover:underline">
-              Post Studio →
-            </Link>
-          ) : null}
-        </div>
+        <SectionHeader
+          title="Recent content"
+          actions={
+            data && data.generated_posts > 0 ? (
+              <Button asChild variant="ghost" size="xs">
+                <Link to="/studio">Open Studio</Link>
+              </Button>
+            ) : null
+          }
+        />
 
         {!data ? (
           <Skeleton className="h-32 rounded-lg" />
         ) : data.recent_content.length === 0 ? (
-          <EmptyHint text="No posts yet — pick a recommended topic above." />
+          <EmptyState
+            icon={PenLine}
+            title="No posts yet"
+            description="Pick a recommended topic above to generate your first post."
+          />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {data.recent_content.map((post) => (
@@ -307,42 +339,15 @@ export function DashboardPage() {
         )}
       </section>
 
-      {data && data.failed_jobs_24h > 0 ? (
-        <p className="text-xs text-warning">
-          ⚠ {data.failed_jobs_24h} pipeline job(s) failed in the last 24 hours.
-        </p>
-      ) : null}
-
       <FormatPickerDialog
         trendId={pickerTrend?.id ?? 0}
         open={pickerTrend !== null}
         onOpenChange={(open) => !open && setPickerTrend(null)}
         onQueued={() => {
-          toast.success('Generation queued — check Recent Content in a few seconds.')
+          toast.success('Generation queued — it will appear in Studio shortly.')
           setTimeout(load, 4000)
         }}
       />
-    </div>
-  )
-}
-
-function PostStatusPill({ status }: { status: string }) {
-  return (
-    <span
-      className={cn(
-        'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
-        status === 'ready' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning',
-      )}
-    >
-      {status}
-    </span>
-  )
-}
-
-function EmptyHint({ text }: { text: string }) {
-  return (
-    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-      {text}
     </div>
   )
 }

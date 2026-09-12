@@ -31,7 +31,7 @@ export function RegisterPage() {
 
     try {
       await register(name, email, password, confirmation)
-      toast.success(`Welcome aboard, ${name.split(' ')[0]}!`)
+      toast.success(`Account created — welcome, ${name.split(' ')[0]}.`)
       navigate('/', { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.errors) {
@@ -46,13 +46,15 @@ export function RegisterPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm py-6">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+          <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
             TD
           </div>
-          <CardTitle className="text-xl">Create your account</CardTitle>
-          <CardDescription>Start discovering engineering trends worth sharing.</CardDescription>
+          <CardTitle className="text-xl tracking-tight">Create your account</CardTitle>
+          <CardDescription>
+            Discover engineering trends worth sharing. Sessions last 60 minutes.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

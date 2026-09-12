@@ -1,59 +1,117 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { PenSquare } from 'lucide-react'
+import { Loader2, MoreHorizontal, PenSquare, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { clearPendingGeneration, fetchPosts, getPendingGenerations, type ContentPost } from '../trends/api'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { ScorePill } from '@/components/shared/ScorePill'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { Toolbar } from '@/components/shared/Toolbar'
+import { contentFormatLabel } from '@/lib/content-formats'
 import { cn } from '@/lib/utils'
+import {
+  clearPendingGeneration,
+  deletePost,
+  deleteTrendPosts,
+  fetchGroupedPosts,
+  getPendingGenerations,
+  type ContentPost,
+  type PostGroup,
+} from '../trends/api'
+import { FormatPickerDialog } from '../trends/FormatPickerDialog'
 
-const STATUS_STYLES: Record<string, string> = {
-  ready: 'bg-success-soft text-success',
-  review: 'bg-warning-soft text-warning',
-  draft: 'bg-surface-muted text-muted-foreground',
-  published: 'bg-info-soft text-info',
-  failed_generation: 'bg-danger-soft text-danger',
+const TAB_STATUS: Record<string, string> = {
+  active: 'draft,review,ready',
+  published: 'published',
+  archived: 'archived',
+  all: '',
+}
+
+interface PendingDelete {
+  type: 'post' | 'group'
+  id: number
+  title: string
 }
 
 export function PostStudioPage() {
-  const [posts, setPosts] = useState<ContentPost[] | null>(null)
   const navigate = useNavigate()
 
-  const load = useCallback(() => {
-    fetchPosts()
-      .then((res) => {
-        setPosts(res.data)
+  const [groups, setGroups] = useState<PostGroup[] | null>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [tab, setTab] = useState('active')
+  const [search, setSearch] = useState('')
+  const [debounced, setDebounced] = useState('')
+  const [pickerTrendId, setPickerTrendId] = useState<number | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
-        // A tracked generation just landed → celebrate + stop watching it.
-        const pending = getPendingGenerations()
-        for (const entry of pending) {
-          if (res.data.some((p) => p.trend_id === entry.trendId)) {
-            clearPendingGeneration(entry.trendId)
-            toast.success('Your generated post is ready.')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(search), 350)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const filters = useMemo(
+    () => ({
+      status: TAB_STATUS[tab],
+      search: debounced || undefined,
+    }),
+    [tab, debounced],
+  )
+
+  const load = useCallback(
+    (cursor?: string | null) => {
+      const isLoadMore = Boolean(cursor)
+
+      if (isLoadMore) setLoadingMore(true)
+      else setGroups(null)
+
+      fetchGroupedPosts(filters, cursor)
+        .then((res) => {
+          setGroups((prev) => (isLoadMore && prev ? [...prev, ...res.data] : res.data))
+          setNextCursor(res.next_cursor ?? null)
+
+          // A tracked generation just landed → celebrate + stop watching it.
+          for (const entry of getPendingGenerations()) {
+            if (res.data.some((group) => group.trend.id === entry.trendId)) {
+              clearPendingGeneration(entry.trendId)
+              toast.success('Your generated post is ready.')
+            }
           }
-        }
-      })
-      .catch(() => {
-        setPosts([])
-        toast.error('Failed to load posts.')
-      })
-  }, [])
+        })
+        .catch(() => toast.error('Failed to load posts.'))
+        .finally(() => setLoadingMore(false))
+    },
+    [filters],
+  )
 
   useEffect(() => {
     load()
+  }, [load])
 
-    // Poll every 5s while a queued generation is still in flight
-    // (real AI runs take 1.5–3+ minutes — far beyond the old 30s window).
+  // Poll while a queued generation is still in flight.
+  useEffect(() => {
     const timer = setInterval(() => {
       if (!document.hidden && getPendingGenerations().length > 0) load()
     }, 5000)
 
-    // Instant refresh when the user returns to the tab.
     const onVisible = () => {
       if (!document.hidden) load()
     }
+
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
@@ -62,84 +120,275 @@ export function PostStudioPage() {
     }
   }, [load])
 
+  async function confirmDelete() {
+    if (!pendingDelete) return
+
+    setDeleting(true)
+
+    try {
+      if (pendingDelete.type === 'post') {
+        await deletePost(pendingDelete.id)
+        toast.success('Post deleted.')
+      } else {
+        const result = await deleteTrendPosts(pendingDelete.id)
+        toast.success(result.message)
+      }
+
+      setPendingDelete(null)
+      load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <header className="space-y-1">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <PenSquare className="size-6 text-primary" />
-          Post Studio
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Generated posts and their quality verdicts. Edit freely — every save creates a
-          version.
-        </p>
-      </header>
-
-      {!posts ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {[0, 1].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-lg" />
-          ))}
-        </div>
-      ) : posts.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No posts yet. Open a trend in the{' '}
-          <Link to="/trends" className="text-primary hover:underline">
-            Trend Explorer
-          </Link>{' '}
-          and click Generate Post.
-        </div>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {posts.map((post) => (
-            <Card
-              key={post.id}
-              className="cursor-pointer transition-shadow hover:shadow-md"
-              onClick={() => navigate(`/studio/${post.id}`)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <Badge variant="secondary" className="text-xs capitalize">
-                    {post.format.replaceAll('_', ' ')}
-                  </Badge>
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-xs font-semibold',
-                      STATUS_STYLES[post.status] ?? 'bg-surface-muted',
-                    )}
-                  >
-                    {post.status.replaceAll('_', ' ')}
-                  </span>
-                </div>
-                <CardTitle className="line-clamp-2 pt-1 text-sm leading-snug">
-                  {post.hook ?? post.title ?? '(untitled)'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>
-                  Quality{' '}
-                  <strong className={cn(post.quality_score !== null && post.quality_score >= 80 && 'text-success')}>
-                    {post.quality_score !== null ? Math.round(post.quality_score) : '—'}
-                  </strong>
-                  {' · '}
-                  v{post.version_count ?? 1}
-                </span>
-                <span>
-                  {new Date(post.generated_at ?? Date.now()).toLocaleDateString()}
-                </span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {posts && posts.length > 0 ? (
-        <p className="text-right text-xs text-muted-foreground">
-          <Button variant="link" size="sm" onClick={load} className="h-auto p-0 text-xs">
+    <div className="mx-auto max-w-5xl space-y-5 p-6">
+      <PageHeader
+        title="Studio"
+        description="Every generated post, grouped under the trend it came from. Create variants per format, tone and angle — delete the ones you don't need."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => load()}
+            title="Reload the list"
+          >
+            <RefreshCw className="size-3.5" />
             Refresh
           </Button>
-        </p>
-      ) : null}
+        }
+      />
+
+      <Toolbar className="justify-between">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="published">Published</TabsTrigger>
+            <TabsTrigger value="archived">Archived</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="relative w-56">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search posts…"
+            className="h-8 pl-8 text-sm"
+          />
+        </div>
+      </Toolbar>
+
+      {!groups ? (
+        <div className="space-y-3">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-40 rounded-lg" />
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
+        <EmptyState
+          icon={PenSquare}
+          title="No posts here yet"
+          description={
+            tab === 'active'
+              ? 'Open a trend in the Trends view and generate your first post — variants will be grouped here.'
+              : 'Nothing matches this filter.'
+          }
+          action={
+            <Button asChild size="sm" variant="outline">
+              <Link to="/trends">Browse trends</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <div className="space-y-3">
+            {groups.map((group) => (
+              <TrendGroupCard
+                key={group.trend.id}
+                group={group}
+                onOpen={(postId) => navigate(`/studio/${postId}`)}
+                onNewVariant={() => setPickerTrendId(group.trend.id)}
+                onDeletePost={(post) =>
+                  setPendingDelete({
+                    type: 'post',
+                    id: post.id,
+                    title: (post.hook ?? post.title ?? 'this post').trim(),
+                  })
+                }
+                onDeleteGroup={() =>
+                  setPendingDelete({
+                    type: 'group',
+                    id: group.trend.id,
+                    title: group.trend.title,
+                  })
+                }
+              />
+            ))}
+          </div>
+
+          {nextCursor ? (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={() => load(nextCursor)} disabled={loadingMore}>
+                {loadingMore ? <Loader2 className="size-4 animate-spin" /> : null}
+                Load more
+              </Button>
+            </div>
+          ) : null}
+        </>
+      )}
+
+      <FormatPickerDialog
+        trendId={pickerTrendId ?? 0}
+        open={pickerTrendId !== null}
+        onOpenChange={(open) => !open && setPickerTrendId(null)}
+        onQueued={() => {
+          setTimeout(() => load(), 1500)
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title={pendingDelete?.type === 'group' ? 'Delete all variants?' : 'Delete this post?'}
+        description={
+          pendingDelete?.type === 'group' ? (
+            <>
+              Every generated variant for <strong>{pendingDelete.title}</strong> will be
+              permanently removed, including versions and attached images. This cannot be undone.
+            </>
+          ) : (
+            <>
+              <strong>{pendingDelete?.title}</strong> will be permanently removed, including its
+              version history and attached images. This cannot be undone.
+            </>
+          )
+        }
+        confirmLabel={pendingDelete?.type === 'group' ? 'Delete variants' : 'Delete post'}
+        onConfirm={() => void confirmDelete()}
+        loading={deleting}
+      />
     </div>
+  )
+}
+
+interface GroupCardProps {
+  group: PostGroup
+  onOpen: (postId: number) => void
+  onNewVariant: () => void
+  onDeletePost: (post: ContentPost) => void
+  onDeleteGroup: () => void
+}
+
+function TrendGroupCard({
+  group,
+  onOpen,
+  onNewVariant,
+  onDeletePost,
+  onDeleteGroup,
+}: GroupCardProps) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <ScorePill score={group.trend.trend_score} />
+              <p className="min-w-0 text-sm font-medium leading-snug">{group.trend.title}</p>
+              {group.trend.hack_style ? (
+                <Badge variant="outline" className="text-[10px] text-primary">
+                  hack
+                </Badge>
+              ) : null}
+              {group.trend.deleted ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  trend deleted
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {group.trend.category?.name ?? 'Uncategorized'} ·{' '}
+              {group.post_count === 1 ? '1 variant' : `${group.post_count} variants`}
+              {group.latest_at
+                ? ` · latest ${new Date(group.latest_at).toLocaleDateString()}`
+                : ''}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="outline" onClick={onNewVariant}>
+              <Plus className="size-3.5" />
+              New variant
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label="Trend actions">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem variant="destructive" onClick={onDeleteGroup}>
+                  Delete all variants
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-1.5">
+        {group.posts.map((post) => (
+          <div
+            key={post.id}
+            className="group flex items-center gap-3 rounded-md border px-3 py-2 transition-colors hover:border-primary/40"
+          >
+            <button
+              type="button"
+              onClick={() => onOpen(post.id)}
+              className="min-w-0 flex-1 text-left"
+            >
+              <p className="truncate text-sm font-medium">
+                {(post.hook ?? post.title ?? '(untitled)').trim()}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {contentFormatLabel(post.format)} · {post.tone}
+                {post.angle ? ` · ${post.angle}` : ''} · v{post.version_count ?? 1}
+                {post.hashtags && post.hashtags.length > 0
+                  ? ` · ${post.hashtags.length} tags`
+                  : ''}
+              </p>
+            </button>
+
+            {post.quality_score !== null ? (
+              <span
+                className={cn(
+                  'shrink-0 text-xs font-semibold tabular-nums',
+                  post.quality_score >= 80 && 'text-success',
+                  post.quality_score < 60 && 'text-danger',
+                )}
+                title="Quality gate score"
+              >
+                {Math.round(post.quality_score)}
+              </span>
+            ) : null}
+
+            <StatusBadge status={post.status} />
+
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Delete post"
+              className="text-muted-foreground hover:text-danger"
+              onClick={() => onDeletePost(post)}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   )
 }

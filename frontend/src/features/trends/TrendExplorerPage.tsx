@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, Radar, RefreshCw, X, Sparkles, Loader2, Target, Wrench } from 'lucide-react'
+import { Search, Radar, RefreshCw, Sparkles, Target, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,9 +21,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { HelpTip } from '@/components/shared/HelpTip'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { ScorePill } from '@/components/shared/ScorePill'
 import { fetchTrends, fetchTaxonomy, fetchTrend, rescoreTrend, deleteTrend, type Taxonomy, type TrendDetail } from './api'
 import { FormatPickerDialog } from './FormatPickerDialog'
-import { scoreTier, type Trend } from './types'
+import type { Trend } from './types'
+import { SCORE_HELP as TREND_SCORE_HELP } from '@/lib/scores'
 import { cn } from '@/lib/utils'
 
 const DATE_RANGES = [
@@ -33,22 +39,6 @@ const DATE_RANGES = [
   { value: '7', label: 'Last 7 days' },
   { value: '14', label: 'Last 14 days' },
 ] as const
-
-const SCORE_TIERS = {
-  high: 'bg-success-soft text-success',
-  medium: 'bg-warning-soft text-warning',
-  low: 'bg-surface-muted text-muted-foreground',
-} as const
-
-const SCORE_HELP: Record<string, string> = {
-  Freshness: 'How recently this story surfaced — decays over ~1.5 days per halving.',
-  Momentum: 'Engagement speed (points/comments per hour since first seen).',
-  Relevance: 'Match strength against your technology & category registry.',
-  Usefulness: 'Practical engineering value — hack/tip phrasing gets a boost.',
-  Focus: 'How well this matches your focus topics (Laravel, PHP/TS, React, Next.js, databases). Soft boost only.',
-  Novelty: 'How fresh and under-covered the story is. High = not everywhere yet.',
-  Saturation: 'How much this topic is already being discussed across sources.',
-}
 
 // Quick topic chips map to the existing technology_id filter.
 const FOCUS_CHIPS = [
@@ -177,15 +167,16 @@ export function TrendExplorerPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <header className="space-y-1">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Radar className="size-6 text-primary" />
-          Trend Explorer
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Clustered stories across all sources, ranked by configurable scoring.
-        </p>
-      </header>
+      <PageHeader
+        title="Trends"
+        description="Clustered stories across every source, ranked by configurable scoring."
+        actions={
+          <Button variant="outline" size="sm" onClick={load}>
+            <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
+            Refresh
+          </Button>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-56 flex-1">
@@ -268,78 +259,71 @@ export function TrendExplorerPage() {
       </div>
 
       {error ? (
-        <div className="rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>
+        <div className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+          {error}
+        </div>
       ) : null}
 
       {loading ? (
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-44 rounded-lg" />
+            <Skeleton key={i} className="h-40 rounded-lg" />
           ))}
         </div>
       ) : trends.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No trends match these filters.
-        </div>
+        <EmptyState
+          icon={Radar}
+          title="No trends match these filters"
+          description="Try widening the date range, clearing the focus toggle, or lowering the minimum score."
+        />
       ) : (
         <>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {trends.map((trend) => {
-              const tier = scoreTier(trend.scores.trend)
-
-              return (
-                <Card
-                  key={trend.id}
-                  onClick={() => openDetail(trend)}
-                  className="cursor-pointer transition-shadow hover:shadow-md"
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 flex-wrap items-center gap-1">
-                        {trend.category ? (
-                          <Badge variant="secondary" className="text-xs">
-                            {trend.category.name}
-                          </Badge>
-                        ) : null}
-                        {trend.hack_style ? (
-                          <Badge variant="outline" className="gap-1 px-1.5 text-[10px] text-primary">
-                            <Wrench className="size-3" />
-                            hack
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <span
-                        className={cn(
-                          'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
-                          SCORE_TIERS[tier],
-                        )}
-                      >
-                        {Math.round(trend.scores.trend)}
+            {trends.map((trend) => (
+              <Card
+                key={trend.id}
+                onClick={() => openDetail(trend)}
+                className="cursor-pointer transition-colors hover:border-primary/40"
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">
+                        {trend.category?.name ?? 'Uncategorized'}
                       </span>
+                      {trend.hack_style ? (
+                        <Badge variant="outline" className="gap-1 text-[10px] text-primary">
+                          <Wrench className="size-3" />
+                          hack
+                        </Badge>
+                      ) : null}
                     </div>
-                    <p className="line-clamp-2 pt-1 text-sm font-medium leading-snug">
-                      {trend.title}
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {trend.technologies && trend.technologies.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {trend.technologies.slice(0, 4).map((tech) => (
-                          <Badge key={tech.id} variant="outline" className="px-1.5 py-0 text-[10px]">
-                            {tech.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : null}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{trend.item_count} signal{trend.item_count === 1 ? '' : 's'}</span>
-                      <span>novelty {Math.round(trend.scores.novelty)}</span>
-                      <span>sat {Math.round(trend.scores.saturation)}</span>
+                    <ScorePill score={trend.scores.trend} />
+                  </div>
+                  <p className="line-clamp-2 pt-1 text-sm font-medium leading-snug">
+                    {trend.title}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {trend.technologies && trend.technologies.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {trend.technologies.slice(0, 4).map((tech) => (
+                        <Badge key={tech.id} variant="outline" className="px-1.5 py-0 text-[10px]">
+                          {tech.name}
+                        </Badge>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                  ) : null}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>
+                      {trend.item_count} signal{trend.item_count === 1 ? '' : 's'}
+                    </span>
+                    <span>novelty {Math.round(trend.scores.novelty)}</span>
+                    <span>sat {Math.round(trend.scores.saturation)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {nextCursor ? (
@@ -362,15 +346,7 @@ export function TrendExplorerPage() {
                   <DialogTitle className="min-w-0 text-left text-base leading-snug [overflow-wrap:anywhere]">
                     {selected.title}
                   </DialogTitle>
-                  <span
-                    className={cn(
-                      'shrink-0 rounded-full px-2.5 py-1 text-sm font-bold tabular-nums',
-                      SCORE_TIERS[scoreTier(selected.scores.trend)],
-                    )}
-                    title="Composite trend score"
-                  >
-                    {Math.round(selected.scores.trend)}
-                  </span>
+                  <ScorePill score={selected.scores.trend} className="px-2.5 py-1 text-sm" />
                 </div>
                 <DialogDescription className="text-left">
                   {selected.category?.name ?? 'Uncategorized'} · {selected.item_count} signal
@@ -391,24 +367,22 @@ export function TrendExplorerPage() {
                 ) : null}
 
                 <section className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Score breakdown
-                  </h3>
-                  {Object.entries({
-                    Freshness: selected.scores.freshness,
-                    Momentum: selected.scores.momentum,
-                    Relevance: selected.scores.relevance,
-                    Usefulness: selected.scores.usefulness,
-                    Focus: selected.scores.focus ?? 0,
-                    Novelty: selected.scores.novelty,
-                    Saturation: selected.scores.saturation,
-                  }).map(([label, value]) => (
+                  <h3 className="text-sm font-semibold">Score breakdown</h3>
+                  {(
+                    [
+                      ['Freshness', selected.scores.freshness, 'freshness'],
+                      ['Momentum', selected.scores.momentum, 'momentum'],
+                      ['Relevance', selected.scores.relevance, 'relevance'],
+                      ['Usefulness', selected.scores.usefulness, 'usefulness'],
+                      ['Focus', selected.scores.focus ?? 0, 'focus'],
+                      ['Novelty', selected.scores.novelty, 'novelty'],
+                      ['Saturation', selected.scores.saturation, 'saturation'],
+                    ] as const
+                  ).map(([label, value, key]) => (
                     <div key={label} className="flex min-w-0 items-center gap-3">
-                      <span
-                        className="w-24 shrink-0 cursor-help text-xs text-muted-foreground underline decoration-dotted decoration-border underline-offset-2"
-                        title={SCORE_HELP[label]}
-                      >
+                      <span className="flex w-24 shrink-0 items-center gap-1 text-xs text-muted-foreground">
                         {label}
+                        <HelpTip text={TREND_SCORE_HELP[key]} />
                       </span>
                       <Progress value={value} className="h-2 min-w-0 flex-1" />
                       <span className="w-9 shrink-0 text-right text-xs tabular-nums">
@@ -420,9 +394,7 @@ export function TrendExplorerPage() {
 
                 {selected.sources.length > 0 ? (
                   <section className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Detected signals
-                    </h3>
+                    <h3 className="text-sm font-semibold">Detected signals</h3>
                     <ul className="space-y-1.5">
                       {selected.sources.slice(0, 8).map((source, i) => (
                         <li key={i} className="flex min-w-0 items-center justify-between gap-2 text-xs">
@@ -467,7 +439,7 @@ export function TrendExplorerPage() {
                   </Button>
                   <Button size="sm" onClick={() => setPickerOpen(true)}>
                     <Sparkles className="size-3.5" />
-                    Generate Post
+                    Generate post
                   </Button>
                 </div>
               </div>
@@ -475,37 +447,25 @@ export function TrendExplorerPage() {
           ) : (
             <div className="flex justify-center p-8">
               <RefreshCw className="size-6 animate-spin text-muted-foreground" />
-              <X className="hidden" />
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <ConfirmDialog
         open={confirmDelete}
-        onOpenChange={(open) => {
-          if (!open) setConfirmDelete(false)
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-left text-base">Delete this trend?</DialogTitle>
-            <DialogDescription className="text-left">
-              It will disappear from all lists. Its {selected?.item_count ?? 0} source items are
-              freed for future clustering, and the trend can be restored via API if needed.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="size-4 animate-spin" /> : null}
-              Delete trend
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setConfirmDelete}
+        title="Delete this trend?"
+        description={
+          <>
+            It disappears from all lists. Its {selected?.item_count ?? 0} source items are freed
+            for future clustering, and generated posts stay in the Studio.
+          </>
+        }
+        confirmLabel="Delete trend"
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
 
       <FormatPickerDialog
         trendId={selected?.id ?? 0}

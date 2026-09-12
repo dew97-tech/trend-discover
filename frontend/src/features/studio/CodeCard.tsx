@@ -1,8 +1,10 @@
-import { forwardRef } from 'react'
+import { forwardRef, type CSSProperties } from 'react'
+import { cn } from '@/lib/utils'
 
 /**
- * ray.so-style shareable code card, rendered as pure DOM so
- * html-to-image can export it to PNG locally (offline, free).
+ * Shareable snippet card rendered as pure DOM so html-to-image can export it
+ * to PNG locally (offline, free). Long code wraps instead of clipping, and
+ * the type scale adapts to the longest line so the card always looks composed.
  */
 
 export interface CodeCardSpec {
@@ -11,25 +13,84 @@ export interface CodeCardSpec {
   title: string
 }
 
-const GRADIENTS = {
-  science: ['#0a66c2', '#004182'],
-  midnight: ['#141e30', '#243b55'],
-  terracotta: ['#b24020', '#915907'],
-  forest: ['#44712e', '#1f3d17'],
-  slate: ['#38434f', '#232b33'],
-} as const
+export interface SnippetTheme {
+  label: string
+  /** Card background (solid or gradient). */
+  background: string
+  /** Code panel background. */
+  panel: string
+  /** Panel ring color. */
+  ring: string
+  /** Header/footer text color. */
+  chrome: string
+  /** Keyword accent for this theme. */
+  keyword: string
+}
 
-export type GradientKey = keyof typeof GRADIENTS
+const CODE_TEXT = '#e6edf3'
+const CODE_STRING = '#a5d6ff'
+const CODE_COMMENT = 'rgba(230, 237, 243, 0.38)'
+const CODE_NUMBER = '#f2cc60'
 
-export const GRADIENT_KEYS = Object.keys(GRADIENTS) as GradientKey[]
+export const SNIPPET_THEMES = {
+  graphite: {
+    label: 'Graphite',
+    background: 'linear-gradient(135deg, #23272e, #0d0f12)',
+    panel: '#0b0d10',
+    ring: 'rgba(255, 255, 255, 0.08)',
+    chrome: 'rgba(255, 255, 255, 0.55)',
+    keyword: '#7ee787',
+  },
+  ink: {
+    label: 'Ink',
+    background: 'linear-gradient(135deg, #1a1c22, #08090b)',
+    panel: '#0a0b0e',
+    ring: 'rgba(255, 255, 255, 0.07)',
+    chrome: 'rgba(255, 255, 255, 0.5)',
+    keyword: '#c3a6ff',
+  },
+  slate: {
+    label: 'Slate',
+    background: 'linear-gradient(135deg, #2b3542, #141a21)',
+    panel: '#10151b',
+    ring: 'rgba(255, 255, 255, 0.08)',
+    chrome: 'rgba(255, 255, 255, 0.55)',
+    keyword: '#8ec7ff',
+  },
+  ocean: {
+    label: 'Ocean',
+    background: 'linear-gradient(135deg, #0c3d63, #061c2d)',
+    panel: '#071a28',
+    ring: 'rgba(255, 255, 255, 0.09)',
+    chrome: 'rgba(255, 255, 255, 0.6)',
+    keyword: '#79c0ff',
+  },
+  clay: {
+    label: 'Clay',
+    background: 'linear-gradient(135deg, #5c3024, #26120d)',
+    panel: '#170b07',
+    ring: 'rgba(255, 255, 255, 0.08)',
+    chrome: 'rgba(255, 255, 255, 0.6)',
+    keyword: '#ffb59e',
+  },
+} as const satisfies Record<string, SnippetTheme>
 
+export type SnippetThemeKey = keyof typeof SNIPPET_THEMES
+
+export const SNIPPET_THEME_KEYS = Object.keys(SNIPPET_THEMES) as SnippetThemeKey[]
+
+const MAX_LINES = 16
 const KEYWORDS =
-  /\b(function|return|if|else|foreach|for|while|class|public|private|protected|static|const|let|var|new|import|from|export|async|await|try|catch|throw|match|fn|use|namespace|echo|SELECT|FROM|WHERE|JOIN|GROUP|ORDER|BY|INDEX|CREATE|ALTER|TABLE)\b/g
+  /\b(function|return|if|else|elseif|foreach|for|while|class|interface|trait|public|private|protected|static|const|let|var|new|import|from|export|default|async|await|try|catch|finally|throw|match|fn|use|namespace|echo|print|SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|GROUP|ORDER|BY|LIMIT|INDEX|CREATE|ALTER|DROP|TABLE|EXPLAIN|VACUUM|WITH|AS|ON|AND|OR|NOT|NULL|TRUE|FALSE|desc|asc)\b/gi
 
-/** Minimal regex highlighter — good enough for share cards. */
-function highlight(code: string): Array<{ text: string; type: 'kw' | 'str' | 'com' | 'num' | 'plain' }> {
-  const tokens: Array<{ text: string; type: 'kw' | 'str' | 'com' | 'num' | 'plain' }> = []
+type TokenType = 'kw' | 'str' | 'com' | 'num' | 'plain'
+interface Token {
+  text: string
+  type: TokenType
+}
 
+function tokenize(code: string): Token[] {
+  const tokens: Token[] = []
   const pattern =
     /(\/\/[^\n]*|#[^\n]*|--[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?\b)/g
 
@@ -50,78 +111,100 @@ function highlight(code: string): Array<{ text: string; type: 'kw' | 'str' | 'co
 
   function pushPlain(segment: string) {
     let pos = 0
+
     for (const m of segment.matchAll(KEYWORDS)) {
-      if ((m.index ?? 0) > pos) {
-        tokens.push({ text: segment.slice(pos, m.index), type: 'plain' })
-      }
+      const index = m.index ?? 0
+      if (index > pos) tokens.push({ text: segment.slice(pos, index), type: 'plain' })
       tokens.push({ text: m[0], type: 'kw' })
-      pos = (m.index ?? 0) + m[0].length
+      pos = index + m[0].length
     }
+
     if (pos < segment.length) tokens.push({ text: segment.slice(pos), type: 'plain' })
   }
 
   pushPlain(code.slice(lastIndex))
+
   return tokens
 }
 
 interface Props {
   spec: CodeCardSpec
-  gradient: GradientKey
-  dark?: boolean
+  theme: SnippetThemeKey
+  className?: string
 }
 
 export const CodeCard = forwardRef<HTMLDivElement, Props>(function CodeCard(
-  { spec, gradient, dark = true },
+  { spec, theme, className },
   ref,
 ) {
-  const [from, to] = GRADIENTS[gradient]
-  const tokens = highlight(spec.code)
+  const t = SNIPPET_THEMES[theme]
+
+  const lines = spec.code.split('\n')
+  const maxLength = Math.max(1, ...lines.map((line) => line.length))
+  const clipped = lines.length > MAX_LINES
+  const visible = clipped
+    ? [...lines.slice(0, MAX_LINES), '…']
+    : lines
+  const code = visible.join('\n')
+  const tokens = tokenize(code)
+
+  const fontSize = maxLength > 58 || visible.length > 14 ? 11 : maxLength > 40 ? 12 : 13
+
+  const tokenStyle: Record<TokenType, CSSProperties> = {
+    kw: { color: t.keyword },
+    str: { color: CODE_STRING },
+    com: { color: CODE_COMMENT, fontStyle: 'italic' },
+    num: { color: CODE_NUMBER },
+    plain: { color: CODE_TEXT },
+  }
 
   return (
     <div
       ref={ref}
-      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
-      className="rounded-xl p-5 shadow-xl"
+      style={{ background: t.background }}
+      className={cn('flex w-full flex-col rounded-xl p-4', className)}
     >
-      <div className="overflow-hidden rounded-lg bg-[#161b22] ring-1 ring-white/10">
-        {/* Window chrome */}
-        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-          <span className="size-3 rounded-full bg-[#ff5f57]" />
-          <span className="size-3 rounded-full bg-[#febc2e]" />
-          <span className="size-3 rounded-full bg-[#28c840]" />
-          <span className="ml-2 text-xs text-white/60">{spec.title}</span>
-          <span className="ml-auto rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/40">
+      <div
+        style={{ backgroundColor: t.panel, boxShadow: `inset 0 0 0 1px ${t.ring}` }}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg"
+      >
+        <div className="flex shrink-0 items-center gap-2 border-b border-white/5 px-4 py-2.5">
+          <span
+            style={{ color: t.chrome }}
+            className="min-w-0 truncate text-xs font-medium"
+          >
+            {spec.title}
+          </span>
+          <span
+            style={{ color: t.chrome }}
+            className="ml-auto shrink-0 rounded-sm bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+          >
             {spec.language}
           </span>
         </div>
-        <pre className="max-h-80 overflow-hidden p-5 font-mono text-[13px] leading-relaxed">
+
+        <pre
+          className="min-h-0 flex-1 overflow-hidden whitespace-pre-wrap break-words p-4 font-mono leading-relaxed"
+          style={{ fontSize }}
+        >
           <code>
             {tokens.map((token, i) => (
-              <span
-                key={i}
-                className={
-                  token.type === 'kw'
-                    ? 'text-[#7ee787]'
-                    : token.type === 'str'
-                      ? 'text-[#a5d6ff]'
-                      : token.type === 'com'
-                        ? 'italic text-white/35'
-                        : token.type === 'num'
-                          ? 'text-[#f2cc60]'
-                          : dark
-                            ? 'text-[#e6edf3]'
-                            : 'text-slate-800'
-                }
-              >
+              <span key={i} style={tokenStyle[token.type]}>
                 {token.text}
               </span>
             ))}
           </code>
         </pre>
+
+        <div className="flex shrink-0 items-center justify-between border-t border-white/5 px-4 py-2.5">
+          <span className="text-[10px] font-semibold tracking-wider text-white/40">
+            TREND DISCOVER
+          </span>
+          <span className="text-[10px] text-white/25">
+            {clipped ? `first ${MAX_LINES} of ${lines.length} lines` : `${visible.length} lines`}
+          </span>
+        </div>
       </div>
-      <p className="mt-3 text-center text-xs font-medium tracking-wide text-white/50">
-        Trend Discover
-      </p>
     </div>
   )
 })

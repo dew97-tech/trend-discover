@@ -16,6 +16,7 @@ class PostResource extends JsonResource
             'title' => $this->title,
             'hook' => $this->hook,
             'body' => $this->body,
+            'hashtags' => $this->hashtags ?? [],
             'format' => $this->format,
             'tone' => $this->tone,
             'angle' => $this->angle,

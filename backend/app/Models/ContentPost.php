@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ContentPost extends Model
 {
     protected $fillable = [
-        'trend_id', 'title', 'hook', 'body', 'format', 'tone', 'angle',
+        'trend_id', 'title', 'hook', 'body', 'hashtags', 'format', 'tone', 'angle',
         'status', 'quality_score', 'quality_breakdown', 'word_count',
         'generated_at', 'published_at', 'published_channel',
     ];
@@ -21,6 +21,7 @@ class ContentPost extends Model
         return [
             'status' => PostStatus::class,
             'quality_breakdown' => 'array',
+            'hashtags' => 'array',
             'generated_at' => 'datetime',
             'published_at' => 'datetime',
         ];

@@ -79,7 +79,37 @@ Produce JSON with exactly these keys:
   "title": "internal working title (max 80 chars)",
   "hook": "first line of the post — must earn the scroll, no clickbait",
   "body": "full post text INCLUDING the hook as first line. 900-1600 characters.
-           Plain text with single newlines between paragraphs. No markdown headers."
+           Plain text with single newlines between paragraphs. No markdown headers.",
+  "hashtags": ["3-5 LinkedIn hashtags, no # symbol, PascalCase, grounded in the
+                specific technologies and topic above. Prefer concrete
+                technologies (Laravel, MySQL, React, Next.js, TypeScript, SQL)
+                and the post's subject; never generic filler like Tech, Coding,
+                Programming, Innovation or Motivation."]
+}
+TXT,
+    ],
+
+    'hashtags' => [
+        'system' => 'You choose LinkedIn hashtags for engineering posts. Return ONLY valid JSON.',
+        'user' => <<<'TXT'
+Pick 3-5 LinkedIn hashtags for the post below.
+
+POST
+{{post_body}}
+
+TREND: {{trend_title}}
+TECHNOLOGIES: {{technologies}}
+
+Rules:
+- No # symbol in the output values. PascalCase (e.g. "NextJs", "QueryOptimization").
+- Prefer the concrete technologies involved and the post's specific subject.
+- Never generic filler: Tech, Coding, Programming, Software, Innovation,
+  Motivation, AI (unless AI is genuinely the subject).
+- Each tag max 30 characters, no spaces, no punctuation.
+
+JSON with exactly this key:
+{
+  "hashtags": ["...", "..."]
 }
 TXT,
     ],

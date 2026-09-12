@@ -1,89 +1,118 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, Copy, Info, Loader2, RefreshCw, Save } from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Hash,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Save,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { fetchPost, patchPost, regeneratePost, type ContentPost } from '../trends/api'
-import { VisualPanel } from './VisualPanel'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { Field } from '@/components/shared/Field'
+import { HelpTip } from '@/components/shared/HelpTip'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { contentFormatLabel } from '@/lib/content-formats'
 import { cn } from '@/lib/utils'
+import {
+  deletePost,
+  fetchPost,
+  fetchPosts,
+  generatePostHashtags,
+  patchPost,
+  regeneratePost,
+  type ContentPost,
+} from '../trends/api'
+import { FormatPickerDialog } from '../trends/FormatPickerDialog'
+import { VisualPanel } from './VisualPanel'
 
-function InfoHint({ text }: { text: string }) {
-  return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span tabIndex={0} className="cursor-help text-muted-foreground/60 hover:text-muted-foreground">
-            <Info className="size-3.5" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-64 text-xs leading-relaxed">
-          {text}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
-
-const DIMENSION_LABELS: Array<[string, string, string]> = [
-  ['technical_accuracy', 'Technical Accuracy', 'Are the claims technically correct and defensible?'],
+const QUALITY_DIMENSIONS: Array<[string, string, string]> = [
+  ['technical_accuracy', 'Technical accuracy', 'Are the claims correct and defensible?'],
   ['novelty', 'Novelty', 'Does it say something non-obvious rather than repeating common knowledge?'],
-  ['practical_value', 'Practical Value', 'Can a working engineer act on this tomorrow?'],
+  ['practical_value', 'Practical value', 'Can a working engineer act on this tomorrow?'],
   ['readability', 'Readability', 'Scannable paragraphs, clean flow, no AI-speak.'],
   ['engagement_potential', 'Engagement', 'Would engineers comment with their own experience?'],
-  ['source_confidence', 'Source Confidence', 'How well the sources support every claim made.'],
+  ['source_confidence', 'Source confidence', 'How well the sources support every claim made.'],
 ]
 
-const STATUS_STYLES: Record<string, string> = {
-  ready: 'bg-success-soft text-success',
-  review: 'bg-warning-soft text-warning',
-  draft: 'bg-surface-muted text-muted-foreground',
-}
+type EditorTab = 'write' | 'preview' | 'quality' | 'visuals'
 
 export function PostEditorPage() {
   const { id } = useParams()
   const navigate = useNavigate()
 
   const [post, setPost] = useState<ContentPost | null>(null)
+  const [siblings, setSiblings] = useState<ContentPost[]>([])
   const [title, setTitle] = useState('')
   const [hook, setHook] = useState('')
   const [body, setBody] = useState('')
+  const [hashtags, setHashtags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [includeHashtags, setIncludeHashtags] = useState(true)
+  const [suggestingTags, setSuggestingTags] = useState(false)
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [dirty, setDirty] = useState(false)
-  const [railTab, setRailTab] = useState<'preview' | 'quality' | 'visual'>('preview')
+  const [tab, setTab] = useState<EditorTab>('write')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
+
+    setPost(null)
+    setDirty(false)
+
     fetchPost(Number(id))
       .then(({ data }: { data: ContentPost }) => {
         setPost(data)
         setTitle(data.title ?? '')
         setHook(data.hook ?? '')
         setBody(data.body)
+        setHashtags(data.hashtags ?? [])
       })
       .catch(() => toast.error('Failed to load post.'))
   }, [id])
+
+  // Sibling variants of the same trend — quick comparison/switching.
+  useEffect(() => {
+    if (!post?.trend_id) return
+
+    fetchPosts({ trend_id: String(post.trend_id), per_page: '50' })
+      .then((res) => setSiblings(res.data))
+      .catch(() => null)
+  }, [post?.trend_id])
+
+  const copyText = useMemo(() => {
+    if (!includeHashtags || hashtags.length === 0) return body
+
+    return `${body.trimEnd()}\n\n${hashtags.map((tag) => `#${tag}`).join(' ')}`
+  }, [body, hashtags, includeHashtags])
 
   function handleSave() {
     if (!post) return
     setSaving(true)
 
-    patchPost(post.id, { title, hook, body })
+    patchPost(post.id, { title, hook, body, hashtags })
       .then(({ data }: { data: ContentPost }) => {
-        setPost(data)
+        setPost({ ...data, trend: post.trend })
+        setHashtags(data.hashtags ?? hashtags)
         setDirty(false)
         toast.success('Saved — new version created.')
       })
@@ -97,26 +126,101 @@ export function PostEditorPage() {
 
     regeneratePost(post.id)
       .then(() => {
-        toast.info('Regeneration queued. Refresh in a few seconds.')
-        setTimeout(() => window.location.reload(), 4000)
+        toast.info('Regeneration queued — it will appear as a new variant in Studio.', {
+          action: { label: 'Open Studio', onClick: () => navigate('/studio') },
+        })
       })
-      .catch(() => {
-        toast.error('Regeneration failed.')
-        setRegenerating(false)
-      })
+      .catch(() => toast.error('Regeneration failed.'))
+      .finally(() => setRegenerating(false))
   }
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(body)
+    await navigator.clipboard.writeText(copyText)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-    toast.success('Copied — paste it into LinkedIn.')
+    toast.success(
+      includeHashtags && hashtags.length > 0
+        ? 'Copied with hashtags — paste into LinkedIn.'
+        : 'Copied — paste into LinkedIn.',
+    )
+  }
+
+  async function handleDelete() {
+    if (!post) return
+    setDeleting(true)
+
+    try {
+      await deletePost(post.id)
+      toast.success('Post deleted.')
+      navigate('/studio')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed.')
+      setDeleting(false)
+    }
+  }
+
+  function addTag(raw: string) {
+    const tag = raw.replace(/^#+/, '').replace(/[^A-Za-z0-9]/g, '')
+    if (tag === '') return
+
+    setHashtags((prev) => {
+      if (prev.some((t) => t.toLowerCase() === tag.toLowerCase())) return prev
+      if (prev.length >= 8) {
+        toast.error('Maximum 8 hashtags.')
+        return prev
+      }
+      return [...prev, tag]
+    })
+    setTagInput('')
+    setDirty(true)
+  }
+
+  function removeTag(tag: string) {
+    setHashtags((prev) => prev.filter((t) => t !== tag))
+    setDirty(true)
+  }
+
+  function handleSuggestHashtags() {
+    if (!post || suggestingTags) return
+
+    setSuggestingTags(true)
+
+    generatePostHashtags(post.id)
+      .then(() => {
+        toast.info('Choosing hashtags with AI…', { duration: 4000 })
+
+        const startedAt = Date.now()
+        const timer = setInterval(() => {
+          fetchPost(post.id)
+            .then(({ data }) => {
+              if ((data.hashtags?.length ?? 0) > 0) {
+                clearInterval(timer)
+                setHashtags(data.hashtags ?? [])
+                setPost((prev) => (prev ? { ...prev, hashtags: data.hashtags } : prev))
+                setSuggestingTags(false)
+                toast.success('Hashtags ready — review and save.')
+              } else if (Date.now() - startedAt > 45_000) {
+                clearInterval(timer)
+                setSuggestingTags(false)
+                toast.error('Still working — check again in a moment.')
+              }
+            })
+            .catch(() => {
+              clearInterval(timer)
+              setSuggestingTags(false)
+            })
+        }, 3000)
+      })
+      .catch(() => {
+        setSuggestingTags(false)
+        toast.error('Could not queue hashtag generation.')
+      })
   }
 
   if (!post) {
     return (
-      <div className="flex min-h-svh items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -125,49 +229,82 @@ export function PostEditorPage() {
   const issues = post.quality_breakdown?.issues ?? []
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-5xl space-y-5 p-6 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/studio')}>
           <ArrowLeft className="size-4" />
           Studio
         </Button>
         <div className="flex items-center gap-2">
-          {post.status && (
-            <span
-              className={cn(
-                'rounded-full px-2.5 py-1 text-xs font-semibold',
-                STATUS_STYLES[post.status] ?? 'bg-surface-muted',
-              )}
-            >
-              {post.status.replaceAll('_', ' ')}
-            </span>
-          )}
-          <Badge variant="secondary" className="text-xs capitalize">
-            {post.format.replaceAll('_', ' ')}
+          <StatusBadge status={post.status} />
+          <Badge variant="outline" className="font-normal">
+            {contentFormatLabel(post.format)}
           </Badge>
         </div>
       </div>
 
-      {post.trend ? (
-        <p className="text-xs text-muted-foreground">
-          From trend:{' '}
-          <Link to="/trends" className="text-primary hover:underline">
-            {post.trend.title}
-          </Link>{' '}
-          · v{post.version_count ?? 1}
-        </p>
-      ) : null}
+      <div className="space-y-2">
+        <h1 className="text-xl font-semibold tracking-tight">
+          {title || hook || 'Untitled variant'}
+        </h1>
+        {post.trend ? (
+          <p className="text-sm text-muted-foreground">
+            From trend:{' '}
+            <Link to="/trends" className="text-primary hover:underline">
+              {post.trend.title}
+            </Link>{' '}
+            · {post.tone}
+            {post.angle ? ` · ${post.angle}` : ''} · v{post.version_count ?? 1}
+          </p>
+        ) : null}
+      </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-        {/* Editor column */}
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="title" className="flex items-center gap-1.5">
-              Working title (internal)
-              <InfoHint text="Never shown on LinkedIn — just for organizing your library." />
-            </Label>
+      {/* Variant switcher — all posts generated from this trend */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {siblings.map((sibling) => {
+          const active = sibling.id === post.id
+
+          return (
+            <button
+              key={sibling.id}
+              type="button"
+              onClick={() => !active && navigate(`/studio/${sibling.id}`)}
+              className={cn(
+                'rounded-md border px-2.5 py-1 text-xs transition-colors',
+                active
+                  ? 'border-primary/50 bg-accent font-medium text-accent-foreground'
+                  : 'text-muted-foreground hover:border-primary/30 hover:text-foreground',
+              )}
+              title={sibling.hook ?? sibling.title ?? undefined}
+            >
+              {contentFormatLabel(sibling.format)} · {sibling.tone}
+              {sibling.angle ? ` · ${sibling.angle}` : ''}
+            </button>
+          )
+        })}
+        <Button variant="ghost" size="xs" onClick={() => setPickerOpen(true)}>
+          <Plus className="size-3" />
+          New variant
+        </Button>
+      </div>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as EditorTab)}>
+        <TabsList className="grid w-full max-w-md grid-cols-4">
+          <TabsTrigger value="write">Write</TabsTrigger>
+          <TabsTrigger value="preview">Preview</TabsTrigger>
+          <TabsTrigger value="quality">Quality</TabsTrigger>
+          <TabsTrigger value="visuals">Visuals</TabsTrigger>
+        </TabsList>
+
+        {/* ── Write ─────────────────────────────────────────── */}
+        <TabsContent value="write" className="space-y-4 pt-2">
+          <Field
+            label="Internal title"
+            htmlFor="post-title"
+            help="Never published — it only labels this variant inside Trend Discover."
+          >
             <Textarea
-              id="title"
+              id="post-title"
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value)
@@ -175,15 +312,16 @@ export function PostEditorPage() {
               }}
               rows={2}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="hook" className="flex items-center gap-1.5">
-              Hook
-              <InfoHint text="The first line of your post — it earns the scroll. LinkedIn truncates after ~210 chars with 'see more'." />
-            </Label>
+          <Field
+            label="Hook"
+            htmlFor="post-hook"
+            help="First line of the post. LinkedIn truncates around 210 characters with “see more”."
+            hint={`${hook.length} characters`}
+          >
             <Textarea
-              id="hook"
+              id="post-hook"
               value={hook}
               onChange={(e) => {
                 setHook(e.target.value)
@@ -191,116 +329,254 @@ export function PostEditorPage() {
               }}
               rows={2}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="body" className="flex items-center gap-1.5">
-              Body — {body.length} chars
-              <InfoHint text="LinkedIn's hard limit is 3000 characters; the sweet spot is 900–1600." />
-            </Label>
+          <Field
+            label="Body"
+            htmlFor="post-body"
+            help="LinkedIn allows up to 3000 characters; 900–1600 performs best."
+            hint={
+              <span
+                className={cn(
+                  body.length > 3000 && 'font-medium text-danger',
+                )}
+              >
+                {body.length} / 3000 characters
+              </span>
+            }
+          >
             <Textarea
-              id="body"
+              id="post-body"
               value={body}
               onChange={(e) => {
                 setBody(e.target.value)
                 setDirty(true)
               }}
-              rows={16}
-              className="font-mono text-sm"
+              rows={14}
             />
-          </div>
+          </Field>
 
-          <div className="flex items-center gap-2 lg:sticky lg:bottom-0 lg:bg-background lg:py-2">
-            <Button onClick={handleSave} disabled={saving || !dirty}>
-              {saving ? <Loader2 className="size-4 animate-spin" /> : dirty ? <Save className="size-4" /> : <Check className="size-4" />}
-              {dirty ? 'Save version' : 'Saved'}
-            </Button>
-            <Button variant="outline" onClick={handleCopy} disabled={copied}>
-              {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-              {copied ? 'Copied' : 'Copy for LinkedIn'}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className="ml-auto"
-              title="Generates a fresh AI draft in this post's format & tone"
-            >
-              <RefreshCw className={cn('size-4', regenerating && 'animate-spin')} />
-              Regenerate
-            </Button>
-          </div>
-        </div>
-
-        {/* Sticky rail — one surface, tab-switched */}
-        <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
-          <Tabs
-            value={railTab}
-            onValueChange={(v) => setRailTab(v as typeof railTab)}
+          <Field
+            label="Hashtags"
+            help="3–5 focused tags outperform generic ones. Click a tag to remove it."
+            hint={`${hashtags.length} of 8 — Copied posts include them at the end.`}
           >
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="preview">Preview</TabsTrigger>
-              <TabsTrigger value="quality">Quality</TabsTrigger>
-              <TabsTrigger value="visual">Visual</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {railTab === 'preview' ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  LinkedIn preview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="max-h-[60vh] overflow-y-auto rounded-lg border bg-white p-4 text-[13px] leading-relaxed whitespace-pre-wrap dark:bg-surface">
-                  {body}
-                </div>
-                <p className="mt-2 text-right text-[11px] text-muted-foreground">{body.length}/3000</p>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {railTab === 'quality' ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Content quality{' '}
-                  <span className="float-right text-base font-bold tabular-nums">
-                    {post.quality_score !== null ? Math.round(post.quality_score) : '—'}/100
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {DIMENSION_LABELS.map(([key, label, help]) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <span
-                      className="w-28 shrink-0 cursor-help text-[11px] text-muted-foreground underline decoration-dotted decoration-border underline-offset-2"
-                      title={help}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {hashtags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-xs text-accent-foreground"
+                  >
+                    #{tag}
+                    <button
+                      type="button"
+                      aria-label={`Remove #${tag}`}
+                      className="text-accent-foreground/60 hover:text-accent-foreground"
+                      onClick={() => removeTag(tag)}
                     >
-                      {label}
-                    </span>
-                    <Progress value={dimensions[key] ?? 0} className="h-1.5 min-w-0 flex-1" />
-                    <span className="w-7 shrink-0 text-right text-[11px] tabular-nums">
-                      {Math.round(dimensions[key] ?? 0)}
-                    </span>
-                  </div>
+                      <X className="size-3" />
+                    </button>
+                  </span>
                 ))}
-
-                {issues.length > 0 ? (
-                  <ul className="mt-3 space-y-1 border-t pt-3">
-                    {issues.map((issue: string, i: number) => (
-                      <li key={i} className="text-[11px] text-warning">• {issue}</li>
-                    ))}
-                  </ul>
+                {hashtags.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    No hashtags yet — add up to 8.
+                  </span>
                 ) : null}
-              </CardContent>
-            </Card>
-          ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addTag(tagInput)
+                    }
+                  }}
+                  placeholder="Add a tag and press Enter"
+                  className="h-8 max-w-56 text-sm"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addTag(tagInput)}
+                  disabled={tagInput.trim() === ''}
+                >
+                  Add
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSuggestHashtags}
+                  disabled={suggestingTags}
+                >
+                  {suggestingTags ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-3.5" />
+                  )}
+                  Suggest with AI
+                </Button>
+              </div>
+            </div>
+          </Field>
+        </TabsContent>
 
-          {railTab === 'visual' ? <VisualPanel post={post} /> : null}
-        </div>
+        {/* ── Preview ───────────────────────────────────────── */}
+        <TabsContent value="preview" className="pt-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">LinkedIn preview</p>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Hash className="size-3" />
+                  Include hashtags
+                  <Switch
+                    checked={includeHashtags}
+                    onCheckedChange={setIncludeHashtags}
+                    className="scale-75"
+                  />
+                </label>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="mx-auto max-w-2xl rounded-lg border bg-surface p-5">
+                <div className="flex items-center gap-2 border-b pb-3">
+                  <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                    You
+                  </span>
+                  <div className="text-xs">
+                    <p className="font-medium">Your name</p>
+                    <p className="text-muted-foreground">Software Engineer</p>
+                  </div>
+                </div>
+                <div className="whitespace-pre-wrap pt-3 text-[15px] leading-relaxed">
+                  {body.trimStart()}
+                </div>
+                {includeHashtags && hashtags.length > 0 ? (
+                  <p className="pt-3 text-[15px] text-primary">
+                    {hashtags.map((tag) => `#${tag}`).join(' ')}
+                  </p>
+                ) : null}
+                <p className="pt-4 text-right text-[11px] text-muted-foreground">
+                  {copyText.length} characters
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Quality ───────────────────────────────────────── */}
+        <TabsContent value="quality" className="pt-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Quality gate
+                  <HelpTip
+                    className="ml-1.5"
+                    text="Composite of six rubric dimensions plus deterministic rule checks. 80+ routes to Ready, 60–79 to Review."
+                  />
+                </p>
+                <span className="text-lg font-semibold tabular-nums">
+                  {post.quality_score !== null ? Math.round(post.quality_score) : '—'}
+                  <span className="text-xs font-normal text-muted-foreground">/100</span>
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              {QUALITY_DIMENSIONS.map(([key, label, help]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="flex w-36 shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    {label}
+                    <HelpTip text={help} />
+                  </span>
+                  <Progress value={dimensions[key] ?? 0} className="h-1.5 min-w-0 flex-1" />
+                  <span className="w-7 shrink-0 text-right text-xs tabular-nums">
+                    {Math.round(dimensions[key] ?? 0)}
+                  </span>
+                </div>
+              ))}
+
+              {issues.length > 0 ? (
+                <ul className="mt-3 space-y-1 border-t pt-3">
+                  {issues.map((issue: string, i: number) => (
+                    <li key={i} className="text-xs text-warning">
+                      • {issue}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="border-t pt-3 text-xs text-success">No issues flagged.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Visuals ───────────────────────────────────────── */}
+        <TabsContent value="visuals" className="pt-2">
+          <VisualPanel post={post} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Sticky action bar */}
+      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center gap-2 border-t bg-background/95 px-6 py-3 backdrop-blur">
+        <Button onClick={handleSave} disabled={saving || !dirty}>
+          {saving ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : dirty ? (
+            <Save className="size-4" />
+          ) : (
+            <Check className="size-4" />
+          )}
+          {dirty ? 'Save version' : 'Saved'}
+        </Button>
+        <Button variant="outline" onClick={handleCopy} disabled={copied}>
+          {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+          {copied ? 'Copied' : 'Copy for LinkedIn'}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleRegenerate}
+          disabled={regenerating}
+          title="Queues a fresh AI draft with the same format, tone and angle — appears as a new variant"
+        >
+          <RefreshCw className={cn('size-4', regenerating && 'animate-spin')} />
+          Regenerate
+        </Button>
+        <Button
+          variant="ghost"
+          className="ml-auto text-muted-foreground hover:text-danger"
+          onClick={() => setConfirmDelete(true)}
+        >
+          <Trash2 className="size-4" />
+          Delete post
+        </Button>
       </div>
+
+      <FormatPickerDialog
+        trendId={post.trend_id}
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onQueued={() => navigate('/studio')}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this post?"
+        description={
+          <>
+            This variant will be permanently removed, including its version history and attached
+            images. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete post"
+        onConfirm={() => void handleDelete()}
+        loading={deleting}
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@ namespace App\Repositories\Eloquent;
 use App\Enums\PostStatus;
 use App\Models\ContentPost;
 use App\Models\ContentVersion;
+use App\Models\Trend;
 use App\Repositories\Contracts\ContentPostRepositoryInterface;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class ContentPostRepository implements ContentPostRepositoryInterface
         return ContentPost::query()
             ->with(['trend' => fn ($q) => $q->withTrashed()->select(['id', 'title'])])
             ->with(['images' => fn ($q) => $q->select(['id', 'content_post_id', 'type', 'status', 'file_path'])])
+            ->withCount('versions')
             ->when($filters['status'] ?? null, function ($q, $status) {
                 // Comma-separated statuses: ?status=review,ready
                 $statuses = collect(explode(',', (string) $status))
@@ -37,6 +39,47 @@ class ContentPostRepository implements ContentPostRepositoryInterface
                 }),
             )
             ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->cursorPaginate($perPage);
+    }
+
+    public function groupedByTrend(array $filters, int $perPage = 10): CursorPaginator
+    {
+        $apply = function ($query) use ($filters) {
+            $query
+                ->when($filters['status'] ?? null, function ($q, $status) {
+                    $statuses = collect(explode(',', (string) $status))
+                        ->map(fn ($s) => trim($s))
+                        ->filter(fn ($s) => PostStatus::tryFrom($s) !== null)
+                        ->all();
+
+                    return $statuses === [] ? $q : $q->whereIn('status', $statuses);
+                })
+                ->when($filters['format'] ?? null, fn ($q, $format) => $q->where('format', $format))
+                ->when(
+                    $filters['search'] ?? null,
+                    fn ($q, $search) => $q->where(function ($q) use ($search) {
+                        $term = '%'.$search.'%';
+                        $q->where('title', 'like', $term)
+                            ->orWhere('hook', 'like', $term)
+                            ->orWhere('body', 'like', $term);
+                    }),
+                );
+        };
+
+        return Trend::query()
+            ->withTrashed()
+            ->whereHas('posts', $apply)
+            ->with([
+                'category:id,name,slug',
+                'posts' => function ($q) use ($apply) {
+                    $apply($q);
+                    $q->withCount('versions')->orderByDesc('updated_at')->orderByDesc('id');
+                },
+            ])
+            ->withCount(['posts as post_count' => $apply])
+            ->withMax(['posts as latest_post_at' => $apply], 'updated_at')
+            ->orderByDesc('latest_post_at')
             ->orderByDesc('id')
             ->cursorPaginate($perPage);
     }

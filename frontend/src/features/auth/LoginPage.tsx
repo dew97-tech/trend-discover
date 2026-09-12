@@ -33,7 +33,7 @@ export function LoginPage() {
 
     try {
       await login(email, password)
-      toast.success('Welcome back!')
+      toast.success('Signed in.')
       navigate(redirectTo, { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
@@ -44,16 +44,18 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm py-6">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+          <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
             TD
           </div>
-          <CardTitle className="text-xl">{isReauth ? 'Session ending' : 'Sign in'}</CardTitle>
+          <CardTitle className="text-xl tracking-tight">
+            {isReauth ? 'Session ending' : 'Sign in to Trend Discover'}
+          </CardTitle>
           <CardDescription>
             {isReauth
               ? 'Re-enter your password to continue your session.'
-              : 'Trend intelligence for software engineers.'}
+              : 'Trend intelligence for software engineers. Sessions last 60 minutes.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
