@@ -19,9 +19,18 @@ return [
             'base_url' => env('OPENCODE_GO_BASE_URL', 'https://opencode.ai/zen/go/v1'),
             'api_key' => env('OPENCODE_GO_API_KEY'),
 
+            /*
+            | The Go gateway now REQUIRES an x-opencode-session header on every
+            | chat request — without it all models fail with MissingSessionID.
+            | Set OPENCODE_GO_SESSION_ID to pin a value; otherwise the provider
+            | generates one UUID and persists it in system_settings('ai.session_id').
+            */
+            'session_id' => env('OPENCODE_GO_SESSION_ID'),
+
             // Runtime override from Settings UI lives in system_settings
-            // ('ai.model') and wins over this env default.
-            'model' => env('OPENCODE_GO_MODEL', 'ox-alpha-free'),
+            // ('ai.model') and wins over this env default. If the stored id is
+            // no longer allowlisted, the provider logs and falls back to this.
+            'model' => env('OPENCODE_GO_MODEL', 'mimo-v2.5'),
 
             /*
             | STRICT allowlist per product decision — requests for anything
@@ -31,30 +40,37 @@ return [
             |   reasoning        — model streams chain-of-thought into a
             |                      separate reasoning_content field; needs a
             |                      large output budget + reasoning_effort control
-            |                      (Hy3: high/medium/low/none — Tencent Hunyuan 3)
-            |   effort           — reasoning_effort sent for reasoning models
+            |   effort           — reasoning_effort sent for reasoning models.
+            |                      Verified live: glm-5.3-flash rejects 'none'
+            |                      ("always engages in thinking") — use 'low';
+            |                      mimo-v2.5 accepts 'none' for direct answers.
             |   max_output       — safe max_tokens ceiling for this model
+            |
+            | Verified live 2026-09-12 (tiny probe + session header):
+            |   mimo-v2.5, deepseek-v4-flash, glm-5.3-flash -> working
+            |   ox-alpha-free -> REMOVED (not supported), hy3 -> upstream 400
             */
             'allowed_models' => [
                 // NOTE: the Go tier (/zen/go/v1) exposes its own ids — always
                 // cross-check against GET /settings/models (on_gateway flag)
-                // rather than the public Zen docs table.
-                'ox-alpha-free' => [
-                    'label' => 'Ox Alpha Free',
-                    'reasoning' => false,
-                    'max_output' => 4096,
-                ],
+                // and `php artisan ai:check-models` rather than the public docs.
                 'mimo-v2.5' => [
-                    'label' => 'MiMo-V2.5 Free',
+                    'label' => 'MiMo-V2.5',
+                    'reasoning' => true,
+                    'effort' => 'none',
+                    'max_output' => 8192,
+                ],
+                'deepseek-v4-flash' => [
+                    'label' => 'DeepSeek V4 Flash',
                     'reasoning' => true,
                     'effort' => 'low',
                     'max_output' => 8192,
                 ],
-                'hy3' => [
-                    'label' => 'Hy3',
+                'glm-5.3-flash' => [
+                    'label' => 'GLM 5.3 Flash',
                     'reasoning' => true,
-                    'effort' => 'none',
-                    'max_output' => 16384,
+                    'effort' => 'low',
+                    'max_output' => 8192,
                 ],
             ],
 
@@ -62,14 +78,15 @@ return [
             'max_retries' => 2,
 
             /*
-            | Cost-ordered fallback chain (per OpenCode Go pricing):
-            | when the active model fails with gateway errors (5xx/unsupported),
-            | requests walk this order — cheapest first — until one answers.
+            | Reliability-ordered fallback chain: when the active model fails
+            | with gateway errors (5xx/unsupported) or burns its budget on
+            | reasoning, requests walk this order until one answers. All Go-tier
+            | calls report cost 0, so this order favors verified reliability.
             */
             'fallback_order' => [
-                'ox-alpha-free',
                 'mimo-v2.5',
-                'hy3',
+                'deepseek-v4-flash',
+                'glm-5.3-flash',
             ],
         ],
     ],

@@ -22,6 +22,7 @@ final class OpenCodeGoProvider implements AIProvider
     public function complete(string $systemPrompt, string $userPrompt): AiResponse
     {
         $config = config('ai.providers.opencode_go');
+        $profiles = $config['allowed_models'];
 
         // Settings UI override wins over .env so models are swappable at runtime.
         $active = (string) (
@@ -29,7 +30,16 @@ final class OpenCodeGoProvider implements AIProvider
             ?? $config['model']
         );
 
-        $profiles = $config['allowed_models'];
+        // A stored model can outlive its gateway (dead/renamed id). Self-heal:
+        // log, then use the allowlisted config default instead of hard-failing.
+        if (! isset($profiles[$active])) {
+            Log::channel('pipeline')->warning('[OpenCodeGoProvider] stored model no longer allowlisted — using config default', [
+                'stored' => $active,
+                'default' => $config['model'],
+            ]);
+
+            $active = (string) $config['model'];
+        }
 
         if (! isset($profiles[$active])) {
             throw new \RuntimeException(
@@ -150,17 +160,7 @@ final class OpenCodeGoProvider implements AIProvider
             $body['reasoning_effort'] = (string) ($profile['effort'] ?? 'low');
         }
 
-        $response = Http::baseUrl($this->apiRoot())
-            ->timeout((int) config('ai.providers.opencode_go.timeout'))
-            ->withToken((string) config('ai.providers.opencode_go.api_key'))
-            ->retry(
-                (int) config('ai.providers.opencode_go.max_retries'),
-                1000,
-                throw: false,
-                when: fn ($exception, $request) => $exception !== null
-                    || in_array($request?->status() ?? 0, [429, 500, 502, 503, 504], true),
-            )
-            ->post('/chat/completions', $body);
+        $response = $this->request($body);
 
         $rawContent = (string) ($response->json('choices.0.message.content') ?? '');
 
@@ -173,15 +173,61 @@ final class OpenCodeGoProvider implements AIProvider
 
             $body['max_tokens'] = $maxTokens * 2;
 
-            $response = Http::baseUrl($this->apiRoot())
-                ->timeout((int) config('ai.providers.opencode_go.timeout'))
-                ->withToken((string) config('ai.providers.opencode_go.api_key'))
-                ->post('/chat/completions', $body);
+            $response = $this->request($body);
 
             $rawContent = (string) ($response->json('choices.0.message.content') ?? '');
         }
 
         return [$response, $rawContent];
+    }
+
+    /**
+     * One authenticated call to /chat/completions. The Go gateway requires
+     * x-opencode-session on every request — without it all models fail.
+     */
+    private function request(array $body): \Illuminate\Http\Client\Response
+    {
+        return Http::baseUrl($this->apiRoot())
+            ->timeout((int) config('ai.providers.opencode_go.timeout'))
+            ->withToken((string) config('ai.providers.opencode_go.api_key'))
+            ->withHeaders(['x-opencode-session' => $this->sessionId()])
+            ->retry(
+                (int) config('ai.providers.opencode_go.max_retries'),
+                1000,
+                throw: false,
+                when: fn ($exception, $request) => $exception !== null
+                    || in_array($request?->status() ?? 0, [429, 500, 502, 503, 504], true),
+            )
+            ->post('/chat/completions', $body);
+    }
+
+    /**
+     * Stable routing session for the gateway (prompt-cache affinity).
+     * Priority: env override → persisted UUID → generate + persist once.
+     */
+    private function sessionId(): string
+    {
+        $configured = trim((string) config('ai.providers.opencode_go.session_id'));
+
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        $stored = \App\Models\SystemSetting::get('ai.session_id');
+
+        if (is_string($stored) && trim($stored) !== '') {
+            return $stored;
+        }
+
+        $generated = (string) \Illuminate\Support\Str::uuid();
+
+        \App\Models\SystemSetting::put('ai.session_id', $generated, group: 'ai');
+
+        Log::channel('pipeline')->info('[OpenCodeGoProvider] generated gateway session id', [
+            'session_id' => $generated,
+        ]);
+
+        return $generated;
     }
 
     /**
