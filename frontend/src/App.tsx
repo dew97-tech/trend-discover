@@ -3,7 +3,6 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AppShell } from '@/components/layout/AppShell'
-import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AuthProvider } from '@/features/auth/AuthProvider'
@@ -38,23 +37,26 @@ export default function App() {
                   <Route
                     path="*"
                     element={
-                      <div className="mx-auto max-w-3xl p-6">
-                        <EmptyState
-                          title="This page does not exist"
-                          description="The link may be outdated. Use the navigation to continue."
-                          action={
-                            <Button asChild size="sm">
-                              <Link to="/">Back to Overview</Link>
-                            </Button>
-                          }
-                        />
+                      <div className="mx-auto flex min-h-[60vh] max-w-3xl flex-col items-start justify-center gap-4 px-4 py-10 sm:px-6">
+                        <span className="font-mono text-xs tracking-[0.08em] text-muted-foreground uppercase">
+                          404
+                        </span>
+                        <h1 className="font-serif text-4xl font-medium tracking-tight">
+                          This page does not exist
+                        </h1>
+                        <p className="max-w-md text-sm text-muted-foreground">
+                          The link may be outdated. Use the navigation to continue.
+                        </p>
+                        <Button asChild size="sm">
+                          <Link to="/">Back to Overview</Link>
+                        </Button>
                       </div>
                     }
                   />
                 </Route>
               </Route>
             </Routes>
-            <Toaster position="top-right" />
+            <Toaster position="bottom-right" />
           </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>

@@ -15,7 +15,11 @@ export function StatusBadge({ status, className }: Props) {
     <Badge
       variant="secondary"
       title={meta.description || undefined}
-      className={cn('border-transparent font-medium', meta.className, className)}
+      className={cn(
+        'border-transparent text-[10px] font-semibold tracking-[0.08em] uppercase',
+        meta.className,
+        className,
+      )}
     >
       {meta.label}
     </Badge>

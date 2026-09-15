@@ -2,10 +2,10 @@
 
 > Software Engineering Trend Intelligence & LinkedIn Content Manager
 > Local-first · Laravel 13 API + React 19 SPA · MySQL 8
-> **Last updated: Phase 12 (model auto-discovery + source expansion)** — see
+> **Last updated: Phase 12 + U1 (Signal Desk redesign)** — see
 > `ARCHITECTURE.md` for logic details, `API.md` for endpoint reference,
 > `RUNBOOK.md` for daily operation, `COOKBOOK.md` for the nightly
-> post-generation workflow.
+> post-generation workflow, and `frontend/DESIGN.md` for the UI system.
 
 ---
 
@@ -62,6 +62,7 @@ combined with high saturation must rank BELOW moderate popularity with high nove
 | D22 | Collapsible sidebar icon rail | Sidebar toggles w-60 ↔ w-16 with tooltip icons, persisted in `localStorage`; navigation stays visible without eating content width |
 | D23 | AI revision suggestions (hook/body) + polished preview | Wrong-answer posts are fixed by describing the correction (optional reference paste) → `RevisePostJob` proposes in `post_revisions`; Apply writes the targeted field + version + queues quality re-check. Grounded in trend research, length-capped ±15%, markdown stripped for LinkedIn; Preview gains block rendering + Raw toggle |
 | D24 | Hook and body separated + fixed app shell | Body no longer stores the hook; Copy/Preview/exports compose `hook + body` exactly once; revisions are target-scoped; `posts:split-hooks` repaired the corpus. Shell is `h-svh` with `main` as the only scroll container, so the collapsible sidebar stays put while content scrolls |
+| D25 | "Signal Desk" redesign (D24 shell superseded) | Colleague feedback: the shadcn-default look read as AI-generated. Full design-system rebuild: paper/ink tokens with one signal accent, Geist + Newsreader + JetBrains Mono, Phosphor icons, top nav + ⌘K command palette, hairline ledgers, URL-synced filters, a11y baseline. Guidance applied from `minimalist-ui`, `redesign-existing-projects`, `design-taste-frontend`, `web-design-guidelines`, `frontend-design`; source of truth is `frontend/DESIGN.md` |
 | D25 | One daily workflow + auto-cleanup + manual trend status + plain-language UI | `pipeline:run` (01:00) batches every source, then chains detection → scoring → cleanup, so only `schedule:work` + `queue:work` run; `CleanupOldTrendsJob` soft-deletes trends idle 2+ days (posts survive); `workflow_status` (draft/ready/posted) is manually set and excluded from the nightly picker; all technical labels renamed (Automation, Post Studio, Originality, Overexposure, Style/Voice, "… Tip" formats, etc.) via shared label modules |
 
 ## 4. Progress Status
@@ -81,6 +82,7 @@ combined with high saturation must rank BELOW moderate popularity with high nove
 | P10 | Grouped Studio, variant management, permanent delete (API + UI), editor full-width tabs, Visuals/CodeCard rebuild | ✅ complete |
 | P11 | Intelligent hashtags: bundled generation, editable chips, AI suggest/backfill, copy integration | ✅ complete |
 | P12 | Overview/Trends/Jobs/Settings/Auth refresh + model auto-discovery + YouTube expansion | ✅ complete |
+| U1 | "Signal Desk" UI redesign — tokens, shell, pages, a11y (`frontend/DESIGN.md`, D25) | ✅ complete |
 | P13 | Publishing channel abstraction + settings toggles (optional) | ⬜ next |
 | P14 | Pest/Vitest tests, query profiling pass, hardening | ⬜ |
 

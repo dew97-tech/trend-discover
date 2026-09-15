@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft,
-  Check,
-  Copy,
-  Hash,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Save,
-  Sparkles,
-  Trash2,
-  Wand2,
-  X,
-} from 'lucide-react'
+  ArrowLeftIcon,
+  ArrowsClockwiseIcon,
+  CheckIcon,
+  CircleNotchIcon,
+  CopyIcon,
+  FloppyDiskIcon,
+  HashIcon,
+  MagicWandIcon,
+  PlusIcon,
+  SparkleIcon,
+  TrashIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -262,7 +262,7 @@ export function PostEditorPage() {
   if (!post) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -271,10 +271,10 @@ export function PostEditorPage() {
   const issues = post.quality_breakdown?.issues ?? []
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-6 pb-4">
+    <div className="mx-auto max-w-[1100px] space-y-6 px-4 pt-8 pb-4 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/studio')}>
-          <ArrowLeft className="size-4" />
+          <ArrowLeftIcon className="size-4" />
           Post Studio
         </Button>
         <div className="flex items-center gap-2">
@@ -286,13 +286,13 @@ export function PostEditorPage() {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-xl font-semibold tracking-tight">
+        <h1 className="font-serif text-2xl font-medium tracking-tight">
           {title || hook || 'Untitled post'}
         </h1>
         {post.trend ? (
           <p className="text-sm text-muted-foreground">
             From trend:{' '}
-            <Link to="/trends" className="text-primary hover:underline">
+            <Link to="/trends" className="text-signal hover:underline">
               {post.trend.title}
             </Link>{' '}
             · {post.tone}
@@ -312,10 +312,10 @@ export function PostEditorPage() {
               type="button"
               onClick={() => !active && navigate(`/studio/${sibling.id}`)}
               className={cn(
-                'rounded-md border px-2.5 py-1 text-xs transition-colors',
+                'rounded-sm border px-2.5 py-1 text-xs transition-colors duration-150',
                 active
-                  ? 'border-primary/50 bg-accent font-medium text-accent-foreground'
-                  : 'text-muted-foreground hover:border-primary/30 hover:text-foreground',
+                  ? 'border-border-strong bg-surface-muted font-medium text-foreground'
+                  : 'border-border text-muted-foreground hover:border-border-strong hover:text-foreground',
               )}
               title={sibling.hook ?? sibling.title ?? undefined}
             >
@@ -325,7 +325,7 @@ export function PostEditorPage() {
           )
         })}
         <Button variant="ghost" size="xs" onClick={() => setPickerOpen(true)}>
-          <Plus className="size-3" />
+          <PlusIcon className="size-3" />
           Generate another post
         </Button>
       </div>
@@ -367,7 +367,7 @@ export function PostEditorPage() {
                 size="xs"
                 onClick={() => setRevisionTarget(revisionTarget === 'hook' ? null : 'hook')}
               >
-                <Wand2 className="size-3" />
+                <MagicWandIcon className="size-3" />
                 Suggest improvement
               </Button>
             }
@@ -411,7 +411,7 @@ export function PostEditorPage() {
                 size="xs"
                 onClick={() => setRevisionTarget(revisionTarget === 'body' ? null : 'body')}
               >
-                <Wand2 className="size-3" />
+                <MagicWandIcon className="size-3" />
                 Suggest improvement
               </Button>
             }
@@ -446,16 +446,16 @@ export function PostEditorPage() {
                 {hashtags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-xs text-accent-foreground"
+                    className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface-muted px-2 py-0.5 font-mono text-xs text-foreground"
                   >
                     #{tag}
                     <button
                       type="button"
                       aria-label={`Remove #${tag}`}
-                      className="text-accent-foreground/60 hover:text-accent-foreground"
+                      className="rounded-sm text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
                       onClick={() => removeTag(tag)}
                     >
-                      <X className="size-3" />
+                      <XIcon className="size-3" />
                     </button>
                   </span>
                 ))}
@@ -476,6 +476,8 @@ export function PostEditorPage() {
                     }
                   }}
                   placeholder="Add a tag and press Enter"
+                  aria-label="Add a hashtag"
+                  spellCheck={false}
                   className="h-8 max-w-56 text-sm"
                 />
                 <Button
@@ -493,9 +495,9 @@ export function PostEditorPage() {
                   disabled={suggestingTags}
                 >
                   {suggestingTags ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <CircleNotchIcon className="size-3.5 animate-spin" />
                   ) : (
-                    <Sparkles className="size-3.5" />
+                    <SparkleIcon className="size-3.5" />
                   )}
                   Suggest with AI
                 </Button>
@@ -511,7 +513,7 @@ export function PostEditorPage() {
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-muted-foreground">LinkedIn preview</p>
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Hash className="size-3" />
+                  <HashIcon className="size-3" />
                   Include hashtags
                   <Switch
                     checked={includeHashtags}
@@ -544,9 +546,9 @@ export function PostEditorPage() {
                     text="Overall quality from six dimensions plus automatic checks. 80+ is ready to post, 60–79 needs a quick review."
                   />
                 </p>
-                <span className="text-lg font-semibold tabular-nums">
+                <span className="font-mono text-lg font-semibold tabular-nums">
                   {post.quality_score !== null ? Math.round(post.quality_score) : '—'}
-                  <span className="text-xs font-normal text-muted-foreground">/100</span>
+                  <span className="font-sans text-xs font-normal text-muted-foreground">/100</span>
                 </span>
               </div>
             </CardHeader>
@@ -558,22 +560,22 @@ export function PostEditorPage() {
                     <HelpTip text={help} />
                   </span>
                   <Progress value={dimensions[key] ?? 0} className="h-1.5 min-w-0 flex-1" />
-                  <span className="w-7 shrink-0 text-right text-xs tabular-nums">
+                  <span className="w-7 shrink-0 text-right font-mono text-xs tabular-nums">
                     {Math.round(dimensions[key] ?? 0)}
                   </span>
                 </div>
               ))}
 
               {issues.length > 0 ? (
-                <ul className="mt-3 space-y-1 border-t pt-3">
+                <ul className="mt-3 list-disc space-y-1 border-t border-border pt-3 pl-4">
                   {issues.map((issue: string, i: number) => (
                     <li key={i} className="text-xs text-warning">
-                      • {issue}
+                      {issue}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="border-t pt-3 text-xs text-success">No issues flagged.</p>
+                <p className="border-t border-border pt-3 text-xs text-success">No issues flagged.</p>
               )}
             </CardContent>
           </Card>
@@ -586,19 +588,19 @@ export function PostEditorPage() {
       </Tabs>
 
       {/* Sticky action bar */}
-      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center gap-2 border-t bg-background/95 px-6 py-3 backdrop-blur">
+      <div className="sticky bottom-0 z-[var(--z-sticky)] -mx-4 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
         <Button onClick={handleSave} disabled={saving || !dirty}>
           {saving ? (
-            <Loader2 className="size-4 animate-spin" />
+            <CircleNotchIcon className="size-4 animate-spin" />
           ) : dirty ? (
-            <Save className="size-4" />
+            <FloppyDiskIcon className="size-4" />
           ) : (
-            <Check className="size-4" />
+            <CheckIcon className="size-4" />
           )}
           {dirty ? 'Save version' : 'Saved'}
         </Button>
         <Button variant="outline" onClick={handleCopy} disabled={copied}>
-          {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+          {copied ? <CheckIcon className="size-4 text-success" /> : <CopyIcon className="size-4" />}
           {copied ? 'Copied' : 'Copy for LinkedIn'}
         </Button>
         <Button
@@ -607,7 +609,7 @@ export function PostEditorPage() {
           disabled={regenerating}
           title="Queues a fresh AI draft with the same style, voice and angle — appears as another post"
         >
-          <RefreshCw className={cn('size-4', regenerating && 'animate-spin')} />
+          <ArrowsClockwiseIcon className={cn('size-4', regenerating && 'animate-spin')} />
           Generate again
         </Button>
         <Button
@@ -615,7 +617,7 @@ export function PostEditorPage() {
           className="ml-auto text-muted-foreground hover:text-danger"
           onClick={() => setConfirmDelete(true)}
         >
-          <Trash2 className="size-4" />
+          <TrashIcon className="size-4" />
           Delete post
         </Button>
       </div>

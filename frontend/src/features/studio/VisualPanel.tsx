@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  AlertTriangle,
-  Check,
-  Copy,
-  Download,
-  ImagePlus,
-  ListOrdered,
-  Loader2,
-  Sparkles,
-  Trash2,
-  Wand2,
-} from 'lucide-react'
+  CheckIcon,
+  CircleNotchIcon,
+  CopyIcon,
+  DownloadSimpleIcon,
+  ImageSquareIcon,
+  ListNumbersIcon,
+  MagicWandIcon,
+  SparkleIcon,
+  TrashIcon,
+  WarningIcon,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { getFontEmbedCSS, toBlob, toPng } from 'html-to-image'
 import { Button } from '@/components/ui/button'
@@ -218,10 +218,10 @@ export function VisualPanel({ post }: Props) {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="flex items-center gap-1.5 text-sm font-medium">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
               Code card
               <HelpTip text="ray.so-style shareable code card. Copy it as an image for LinkedIn — the export is 2x and sized so the code stays readable in the feed." />
-            </p>
+            </h2>
             <div className="flex flex-wrap items-center gap-1.5">
               <Button
                 variant="outline"
@@ -230,9 +230,9 @@ export function VisualPanel({ post }: Props) {
                 disabled={busy !== null || pendingSnippet !== null}
               >
                 {busy === 'snippet' || pendingSnippet !== null ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <CircleNotchIcon className="size-3.5 animate-spin" />
                 ) : (
-                  <Wand2 className="size-3.5" />
+                  <MagicWandIcon className="size-3.5" />
                 )}
                 {readySnippet ? 'Suggest again' : 'Suggest code card'}
               </Button>
@@ -240,7 +240,7 @@ export function VisualPanel({ post }: Props) {
               {readySnippet ? (
                 <>
                   <Select value={theme} onValueChange={(v) => setTheme(v as SnippetThemeKey)}>
-                    <SelectTrigger size="sm" className="w-28">
+                    <SelectTrigger size="sm" className="w-28" aria-label="Card theme">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -256,7 +256,7 @@ export function VisualPanel({ post }: Props) {
                     value={exportSize}
                     onValueChange={(v) => setExportSize(v as CardSizeKey)}
                   >
-                    <SelectTrigger size="sm" className="w-40">
+                    <SelectTrigger size="sm" className="w-40" aria-label="Export size">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -277,7 +277,7 @@ export function VisualPanel({ post }: Props) {
                       step={8}
                       value={padding}
                       onChange={(e) => setPadding(Number(e.target.value))}
-                      className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-border accent-primary"
+                      className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
                       aria-label="Canvas padding"
                     />
                   </label>
@@ -289,7 +289,7 @@ export function VisualPanel({ post }: Props) {
                     aria-pressed={lineNumbers}
                     onClick={() => setLineNumbers((v) => !v)}
                   >
-                    <ListOrdered className="size-3.5" />
+                    <ListNumbersIcon className="size-3.5" />
                   </Button>
 
                   <Button
@@ -299,9 +299,9 @@ export function VisualPanel({ post }: Props) {
                     disabled={exporting !== null || !highlighted}
                   >
                     {exporting === 'copy' ? (
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <CircleNotchIcon className="size-3.5 animate-spin" />
                     ) : (
-                      <Copy className="size-3.5" />
+                      <CopyIcon className="size-3.5" />
                     )}
                     Copy image
                   </Button>
@@ -313,9 +313,9 @@ export function VisualPanel({ post }: Props) {
                     disabled={exporting !== null || !highlighted}
                   >
                     {exporting === 'png' ? (
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <CircleNotchIcon className="size-3.5 animate-spin" />
                     ) : (
-                      <Download className="size-3.5" />
+                      <DownloadSimpleIcon className="size-3.5" />
                     )}
                     PNG
                   </Button>
@@ -327,7 +327,7 @@ export function VisualPanel({ post }: Props) {
                     className="text-muted-foreground hover:text-danger"
                     onClick={() => setConfirmRemove(true)}
                   >
-                    <Trash2 className="size-3.5" />
+                    <TrashIcon className="size-3.5" />
                   </Button>
                 </>
               ) : null}
@@ -340,7 +340,7 @@ export function VisualPanel({ post }: Props) {
             <SnippetSkeleton />
           ) : failedSnippet !== null && readySnippet === null ? (
             <EmptyState
-              icon={AlertTriangle}
+              icon={WarningIcon}
               title="Code card generation failed"
               description="The AI could not derive a code card from this post. Try again."
               action={
@@ -382,9 +382,9 @@ export function VisualPanel({ post }: Props) {
               </div>
               <p className="flex items-center justify-center gap-1.5 pt-2 text-center text-xs text-muted-foreground">
                 {highlighted ? (
-                  <Check className="size-3 text-success" />
+                  <CheckIcon className="size-3 text-success" />
                 ) : (
-                  <Loader2 className="size-3 animate-spin" />
+                  <CircleNotchIcon className="size-3 animate-spin" />
                 )}
                 {readySnippet.spec.title} · {readySnippet.spec.language} · export{' '}
                 {card.width * EXPORT_SCALE}×{card.height * EXPORT_SCALE}
@@ -392,7 +392,7 @@ export function VisualPanel({ post }: Props) {
             </div>
           ) : (
             <EmptyState
-              icon={Wand2}
+              icon={MagicWandIcon}
               title="No code card yet"
               description="Generate a code card from the most illustrative part of this post."
               action={
@@ -429,10 +429,10 @@ export function VisualPanel({ post }: Props) {
       <div className="space-y-4">
         <Card>
           <CardHeader className="pb-2">
-            <p className="flex items-center gap-1.5 text-sm font-medium">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
               AI image prompt
               <HelpTip text="A ready-to-paste prompt for an image generator. Trend Discover writes the prompt; you generate the image where you like." />
-            </p>
+            </h2>
           </CardHeader>
           <CardContent className="space-y-2">
             <Button
@@ -443,18 +443,18 @@ export function VisualPanel({ post }: Props) {
               disabled={busy !== null || prompts.filter((p) => p.status === 'pending').length > 0}
             >
               {busy === 'prompt' ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <CircleNotchIcon className="size-3.5 animate-spin" />
               ) : (
-                <Sparkles className="size-3.5" />
+                <SparkleIcon className="size-3.5" />
               )}
               Generate prompt ({prompts.length}/2)
             </Button>
 
             {prompts.map((img) => (
-              <div key={img.id} className="rounded-md border bg-surface-muted p-2.5">
+              <div key={img.id} className="rounded-md border border-border bg-surface-muted p-2.5">
                 {img.status === 'pending' ? (
                   <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="size-3 animate-spin" />
+                    <CircleNotchIcon className="size-3 animate-spin" />
                     Writing prompt…
                   </p>
                 ) : img.status === 'failed' ? (
@@ -469,13 +469,13 @@ export function VisualPanel({ post }: Props) {
                   {img.status === 'ready' ? (
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                      className="inline-flex items-center gap-1 text-[11px] text-signal hover:underline"
                       onClick={() => {
                         void navigator.clipboard.writeText(img.prompt_text ?? '')
                         toast.success('Prompt copied.')
                       }}
                     >
-                      <Copy className="size-3" />
+                      <CopyIcon className="size-3" />
                       Copy prompt
                     </button>
                   ) : (
@@ -496,16 +496,16 @@ export function VisualPanel({ post }: Props) {
 
         <Card>
           <CardHeader className="pb-2">
-            <p className="text-sm font-medium">Your images</p>
+            <h2 className="text-sm font-semibold tracking-tight">Your images</h2>
           </CardHeader>
           <CardContent className="space-y-2">
             <label
               className={cn(
                 'flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed py-2.5 text-xs text-muted-foreground transition-colors',
-                'hover:border-primary hover:text-primary',
+                'hover:border-signal hover:text-signal',
               )}
             >
-              <ImagePlus className="size-3.5" />
+              <ImageSquareIcon className="size-3.5" />
               Upload an image
               <input
                 type="file"
@@ -525,16 +525,19 @@ export function VisualPanel({ post }: Props) {
                   <div key={upload.id} className="group relative">
                     <img
                       src={upload.url ?? ''}
-                      alt="Uploaded visual"
-                      className="aspect-square w-full rounded-md border object-cover"
+                      alt={`Visual for ${post.title ?? 'this post'}`}
+                      width={upload.width ?? 400}
+                      height={upload.height ?? 400}
+                      loading="lazy"
+                      className="aspect-square w-full rounded-md border border-border object-cover"
                     />
                     <button
                       type="button"
                       aria-label="Delete image"
-                      className="absolute -right-1.5 -top-1.5 hidden rounded-full bg-danger p-1 text-white group-hover:block"
+                      className="absolute -top-1.5 -right-1.5 hidden rounded-sm bg-danger p-1 text-destructive-foreground group-hover:block group-focus-within:block"
                       onClick={() => void deleteImage(upload.id).then(refresh)}
                     >
-                      <Trash2 className="size-3" />
+                      <TrashIcon className="size-3" />
                     </button>
                   </div>
                 ))}
@@ -578,8 +581,8 @@ function SnippetSkeleton() {
         </div>
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="flex items-center gap-2 rounded-md border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-          <Loader2 className="size-3.5 animate-spin" />
+        <span className="flex items-center gap-2 rounded-md border border-border bg-surface/90 px-3 py-1.5 text-xs text-muted-foreground">
+          <CircleNotchIcon className="size-3.5 animate-spin" />
           Generating code card…
         </span>
       </div>

@@ -1,26 +1,31 @@
-import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Activity,
-  LayoutDashboard,
-  Library,
-  LogOut,
-  Menu,
-  Monitor,
-  Moon,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PenSquare,
-  Radar,
-  Settings,
-  Sun,
-  X,
-  type LucideIcon,
-} from 'lucide-react'
+  BooksIcon,
+  CaretDownIcon,
+  CrosshairIcon,
+  DesktopIcon,
+  GearSixIcon,
+  ListIcon,
+  MagnifyingGlassIcon,
+  MoonIcon,
+  NotePencilIcon,
+  PulseIcon,
+  SignOutIcon,
+  SquaresFourIcon,
+  SunIcon,
+  type Icon,
+} from '@phosphor-icons/react'
+import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,91 +38,47 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { cn } from '@/lib/utils'
+import { BrandMark } from './BrandMark'
+import { CommandPalette } from './CommandPalette'
 import { ThemeToggle } from './ThemeToggle'
 
 interface NavItem {
   to: string
   label: string
-  icon: LucideIcon
+  icon: Icon
   end?: boolean
 }
 
-const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
-  {
-    label: 'Discover',
-    items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/trends', label: 'Trends', icon: Radar },
-    ],
-  },
-  {
-    label: 'Create',
-    items: [
-      { to: '/studio', label: 'Post Studio', icon: PenSquare },
-      { to: '/library', label: 'Post Library', icon: Library },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
-      { to: '/jobs', label: 'Automation', icon: Activity },
-      { to: '/settings', label: 'Settings', icon: Settings },
-    ],
-  },
+const NAV_ITEMS: NavItem[] = [
+  { to: '/', label: 'Overview', icon: SquaresFourIcon, end: true },
+  { to: '/trends', label: 'Trends', icon: CrosshairIcon },
+  { to: '/studio', label: 'Studio', icon: NotePencilIcon },
+  { to: '/library', label: 'Library', icon: BooksIcon },
+  { to: '/jobs', label: 'Jobs', icon: PulseIcon },
+  { to: '/settings', label: 'Settings', icon: GearSixIcon },
 ]
 
-const SIDEBAR_COLLAPSED_KEY = 'td_shell_sidebar_collapsed'
-
-function ProductMark() {
+function NavEntries({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <span
-      aria-hidden
-      className="flex size-6 items-center justify-center rounded-md bg-primary text-[10px] font-bold tracking-tight text-primary-foreground"
-    >
-      TD
-    </span>
-  )
-}
-
-function NavEntries({
-  onNavigate,
-  collapsed = false,
-}: {
-  onNavigate?: () => void
-  collapsed?: boolean
-}) {
-  return (
-    <nav className={cn('flex-1 space-y-5 p-3', collapsed && 'px-2')}>
-      {NAV_GROUPS.map((group) => (
-        <div key={group.label} className="space-y-1">
-          {!collapsed ? (
-            <p className="px-3 text-[11px] font-medium tracking-wide text-muted-foreground/70">
-              {group.label}
-            </p>
-          ) : null}
-          {group.items.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              onClick={onNavigate}
-              title={collapsed ? label : undefined}
-              aria-label={collapsed ? label : undefined}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center rounded-md text-sm transition-colors',
-                  collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2',
-                  isActive
-                    ? 'bg-accent font-medium text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground',
-                )
-              }
-            >
-              <Icon className="size-4 shrink-0" />
-              {!collapsed ? label : null}
-            </NavLink>
-          ))}
-        </div>
+    <nav className="flex-1 space-y-0.5 px-3 py-2" aria-label="Primary">
+      {NAV_ITEMS.map(({ to, label, icon: NavIcon, end }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors duration-150',
+              isActive
+                ? 'bg-accent font-medium text-accent-foreground'
+                : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground',
+            )
+          }
+        >
+          <NavIcon className="size-4 shrink-0" />
+          {label}
+        </NavLink>
       ))}
     </nav>
   )
@@ -133,13 +94,13 @@ function ThemeMenuItems() {
       </DropdownMenuLabel>
       <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
         <DropdownMenuRadioItem value="light">
-          <Sun className="size-4" /> Light
+          <SunIcon className="size-4" /> Light
         </DropdownMenuRadioItem>
         <DropdownMenuRadioItem value="dark">
-          <Moon className="size-4" /> Dark
+          <MoonIcon className="size-4" /> Dark
         </DropdownMenuRadioItem>
         <DropdownMenuRadioItem value="system">
-          <Monitor className="size-4" /> System
+          <DesktopIcon className="size-4" /> System
         </DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
     </>
@@ -150,31 +111,19 @@ export function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const mainRef = useRef<HTMLElement>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
-  function toggleSidebar() {
-    const next = !collapsed
-    setCollapsed(next)
-
-    try {
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0')
-    } catch {
-      // Storage unavailable (private mode) — the toggle still works in-session.
-    }
-  }
-
-  // main is the scroll container now — reset it on navigation.
   useEffect(() => {
-    mainRef.current?.scrollTo({ top: 0 })
-  }, [location.pathname])
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   async function handleLogout() {
     await logout()
@@ -182,139 +131,143 @@ export function AppShell() {
     navigate('/login')
   }
 
-  const renderUserMenu = (compact = false) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={compact ? 'Account menu' : undefined}
-          className={cn(
-            'flex w-full items-center rounded-md text-left transition-colors hover:bg-surface-muted',
-            compact ? 'justify-center p-2' : 'gap-3 px-2 py-2',
-          )}
-        >
-          <Avatar className="size-8 shrink-0">
-            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-              {user?.name.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          {!compact ? (
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{user?.name}</span>
-              <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
-            </span>
-          ) : null}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" className="w-56">
-        <ThemeMenuItems />
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
-          <LogOut className="size-4" />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-
   return (
-    <div className="flex h-svh overflow-hidden">
-      {/* Desktop sidebar — collapsible icon rail */}
-      <aside
-        className={cn(
-          'hidden min-h-0 shrink-0 flex-col overflow-y-auto border-r bg-surface transition-[width] duration-200 ease-out md:flex',
-          collapsed ? 'w-16' : 'w-60',
-        )}
+    <div className="min-h-svh">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[var(--z-toast)] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:text-primary-foreground"
       >
-        <div
-          className={cn(
-            'flex h-14 shrink-0 items-center border-b',
-            collapsed ? 'justify-center px-2' : 'gap-2 px-5',
-          )}
-        >
-          {collapsed ? (
+        Skip to content
+      </a>
+
+      <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-surface/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4 sm:px-6">
+          <Link
+            to="/"
+            className="flex shrink-0 items-center gap-2.5 rounded-sm focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+          >
+            <BrandMark />
+            <span className="font-semibold tracking-tight">Trend Discover</span>
+          </Link>
+
+          <nav className="ml-2 hidden items-center gap-0.5 lg:flex" aria-label="Primary">
+            {NAV_ITEMS.map(({ to, label, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  cn(
+                    'relative rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                    isActive
+                      ? 'font-medium text-foreground after:absolute after:inset-x-3 after:-bottom-[9px] after:h-0.5 after:bg-signal'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="hidden h-8 items-center gap-3 rounded-md border border-border bg-surface px-3 text-sm text-muted-foreground transition-colors duration-150 hover:border-border-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none sm:flex"
+            >
+              <MagnifyingGlassIcon className="size-3.5" />
+              <span className="pr-8">Search</span>
+              <kbd className="rounded-sm border border-border bg-surface-muted px-1.5 font-mono text-[10px] text-muted-foreground">
+                ⌘K
+              </kbd>
+            </button>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Expand sidebar"
-              aria-expanded={false}
-              onClick={toggleSidebar}
+              aria-label="Search"
+              onClick={() => setPaletteOpen(true)}
+              className="sm:hidden"
             >
-              <PanelLeftOpen className="size-4" />
+              <MagnifyingGlassIcon className="size-4" />
             </Button>
-          ) : (
-            <>
-              <ProductMark />
-              <span className="truncate font-semibold tracking-tight">Trend Discover</span>
-              <div className="ml-auto flex items-center gap-1">
-                <ThemeToggle />
+
+            <ThemeToggle />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Account menu"
+                  className="flex items-center gap-1.5 rounded-md p-0.5 transition-colors duration-150 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                >
+                  <Avatar>
+                    <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                      {user?.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <CaretDownIcon className="hidden size-3 text-muted-foreground sm:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <span className="block truncate text-sm font-medium">{user?.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <ThemeMenuItems />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <SignOutIcon className="size-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+              <DialogTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="Collapse sidebar"
-                  aria-expanded
-                  onClick={toggleSidebar}
+                  aria-label="Open navigation"
+                  className="lg:hidden"
                 >
-                  <PanelLeftClose className="size-4" />
+                  <ListIcon className="size-4" />
                 </Button>
-              </div>
-            </>
-          )}
-        </div>
-        <NavEntries collapsed={collapsed} />
-        <div className={cn('border-t', collapsed ? 'p-2' : 'p-3')}>
-          {renderUserMenu(collapsed)}
-        </div>
-      </aside>
-
-      {/* Mobile top bar */}
-      <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b bg-surface px-4 md:hidden">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Open navigation"
-          onClick={() => setMobileNavOpen(true)}
-        >
-          <Menu className="size-4" />
-        </Button>
-        <ProductMark />
-        <span className="font-semibold tracking-tight">Trend Discover</span>
-        <div className="ml-auto">
-          <ThemeToggle />
-        </div>
-      </div>
-
-      {/* Mobile drawer */}
-      {mobileNavOpen ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div
-            className="absolute inset-0 bg-foreground/40"
-            onClick={() => setMobileNavOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 flex w-72 flex-col border-r bg-surface">
-            <div className="flex h-14 items-center justify-between border-b px-4">
-              <span className="flex items-center gap-2 font-semibold tracking-tight">
-                <ProductMark />
-                Trend Discover
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Close navigation"
-                onClick={() => setMobileNavOpen(false)}
+              </DialogTrigger>
+              <DialogContent
+                showCloseButton={false}
+                className="inset-x-0 top-14 max-h-[calc(100dvh-3.5rem)] w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto overscroll-contain rounded-none border-x-0 border-t-0 p-0 data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top"
               >
-                <X className="size-4" />
-              </Button>
-            </div>
-            <NavEntries onNavigate={() => setMobileNavOpen(false)} />
-            <div className="border-t p-3">{renderUserMenu()}</div>
+                <DialogTitle className="sr-only">Navigation</DialogTitle>
+                <div className="flex items-center justify-between px-5 pt-4 pb-1">
+                  <span className="font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
+                    Navigate
+                  </span>
+                  <ThemeToggle />
+                </div>
+                <NavEntries onNavigate={() => setMobileNavOpen(false)} />
+                <div className="border-t border-border p-4">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-surface-muted hover:text-foreground"
+                  >
+                    <SignOutIcon className="size-4" />
+                    Sign out
+                  </button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
-      ) : null}
+      </header>
 
-      <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-auto pt-14 md:pt-0">
+      <main id="main-content" key={location.pathname} className="route-enter">
         <Outlet />
       </main>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   )
 }

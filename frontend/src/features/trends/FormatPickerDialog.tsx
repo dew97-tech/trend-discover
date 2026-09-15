@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
+import { CircleNotchIcon, SparkleIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -95,8 +95,8 @@ export function FormatPickerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="size-4 text-primary" />
+          <DialogTitle className="flex items-center gap-2">
+            <SparkleIcon className="size-4 text-signal" />
             Create a post
           </DialogTitle>
           <DialogDescription>
@@ -107,11 +107,11 @@ export function FormatPickerDialog({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label>Style</Label>
+              <Label id="format-label">Style</Label>
               <HelpTip text="The shape the post takes. Tip formats are the practical, tutorial-style core of this tool." />
             </div>
             <Select value={format} onValueChange={setFormat}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full" aria-labelledby="format-label">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-72">
@@ -136,11 +136,11 @@ export function FormatPickerDialog({
 
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label>Voice</Label>
+              <Label id="tone-label">Voice</Label>
               <HelpTip text="How the post sounds. Keep one voice per post so comparisons stay honest." />
             </div>
             <Select value={tone} onValueChange={setTone}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full" aria-labelledby="tone-label">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -173,7 +173,7 @@ export function FormatPickerDialog({
           </div>
 
           <Button onClick={handleGenerate} disabled={submitting} className="w-full">
-            {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+            {submitting ? <CircleNotchIcon className="size-4 animate-spin" /> : null}
             Create post
           </Button>
         </div>

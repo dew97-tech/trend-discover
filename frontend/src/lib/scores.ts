@@ -9,7 +9,7 @@ export function scoreTier(score: number): ScoreTier {
 export const SCORE_TIER_CLASS: Record<ScoreTier, string> = {
   high: 'bg-success-soft text-success',
   medium: 'bg-warning-soft text-warning',
-  low: 'bg-surface-muted text-muted-foreground',
+  low: 'bg-score-low-soft text-score-low',
 }
 
 export const SCORE_HELP: Record<string, string> = {

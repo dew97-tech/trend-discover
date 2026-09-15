@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
+import { CircleNotchIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -37,8 +37,8 @@ export function ConfirmDialog({
     <Dialog open={open} onOpenChange={(next) => !loading && onOpenChange(next)}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-left text-base">{title}</DialogTitle>
-          <DialogDescription className="text-left">{description}</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="flex justify-end gap-2">
           <Button
@@ -55,7 +55,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+            {loading ? <CircleNotchIcon className="size-4 animate-spin" /> : null}
             {confirmLabel}
           </Button>
         </div>

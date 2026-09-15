@@ -1,13 +1,19 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CircleNotchIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { BrandMark } from '@/components/layout/BrandMark'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { ApiError } from '@/lib/api'
+
+const SIGNALS = [
+  'Hacker News · GitHub · Lobste.rs',
+  'Dev.to · RSS feeds · YouTube',
+  'Scored for novelty, not just buzz',
+]
 
 export function LoginPage() {
   const { user, login } = useAuth()
@@ -43,22 +49,52 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-sm py-6">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-            TD
+    <div className="grid min-h-svh lg:grid-cols-[1.05fr_1fr]">
+      <aside className="hidden flex-col justify-between border-r border-border bg-surface p-10 lg:flex">
+        <div className="flex items-center gap-2.5">
+          <BrandMark />
+          <span className="font-semibold tracking-tight">Trend Discover</span>
+        </div>
+
+        <div className="space-y-4">
+          <p className="max-w-md font-serif text-4xl leading-[1.08] font-medium tracking-tight">
+            Software engineering trends, scored before they saturate.
+          </p>
+          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Collect stories across six sources, rank them by novelty and practical value, then
+            turn the best ones into posts you can publish.
+          </p>
+        </div>
+
+        <ul className="space-y-2">
+          {SIGNALS.map((signal) => (
+            <li
+              key={signal}
+              className="font-mono text-[11px] tracking-[0.06em] text-muted-foreground uppercase"
+            >
+              {signal}
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <main className="flex items-center justify-center px-4 py-10 sm:px-6">
+        <div className="w-full max-w-sm space-y-7">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5 lg:hidden">
+              <BrandMark />
+              <span className="font-semibold tracking-tight">Trend Discover</span>
+            </div>
+            <h1 className="pt-2 font-serif text-2xl font-medium tracking-tight">
+              {isReauth ? 'Session ending' : 'Sign in'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isReauth
+                ? 'Re-enter your password to continue your session.'
+                : 'Sessions last 60 minutes, then you sign in again.'}
+            </p>
           </div>
-          <CardTitle className="text-xl tracking-tight">
-            {isReauth ? 'Session ending' : 'Sign in to Trend Discover'}
-          </CardTitle>
-          <CardDescription>
-            {isReauth
-              ? 'Re-enter your password to continue your session.'
-              : 'Trend intelligence for software engineers. Sessions last 60 minutes.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -67,6 +103,7 @@ export function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
+                spellCheck={false}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
@@ -91,21 +128,21 @@ export function LoginPage() {
             ) : null}
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              {submitting ? <CircleNotchIcon className="size-4 animate-spin" /> : null}
               {isReauth ? 'Stay signed in' : 'Sign in'}
             </Button>
 
             {!isReauth ? (
-              <p className="text-center text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 No account?{' '}
-                <Link to="/register" className="font-medium text-primary hover:underline">
+                <Link to="/register" className="font-medium text-signal hover:underline">
                   Create one
                 </Link>
               </p>
             ) : null}
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </main>
     </div>
   )
 }

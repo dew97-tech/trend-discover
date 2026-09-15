@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, RefreshCw, Save, TriangleAlert } from 'lucide-react'
+import {
+  ArrowsClockwiseIcon,
+  CircleNotchIcon,
+  FloppyDiskIcon,
+  WarningIcon,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -256,7 +261,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-6">
+    <div className="mx-auto max-w-[900px] space-y-8 px-4 py-8 sm:px-6">
       <PageHeader
         title="Settings"
         description="Runtime configuration — changes apply without redeploying."
@@ -266,7 +271,7 @@ export function SettingsPage() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <p className="flex items-center gap-1.5 text-sm font-medium">
+            <p className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
               Trend scoring
               <HelpTip text="Weights for the overall trend score. The score is normalized by the sum of weights, so relative values matter more than exact totals." />
             </p>
@@ -289,9 +294,10 @@ export function SettingsPage() {
                 step="0.01"
                 value={weights[key] ?? 0}
                 onChange={(e) => setWeights((w) => ({ ...w, [key]: Number(e.target.value) }))}
-                className="h-1.5 flex-1 accent-[var(--primary)]"
+                aria-label={`${label} weight`}
+                className="h-1.5 flex-1 accent-[var(--signal)]"
               />
-              <span className="w-10 text-right text-xs tabular-nums">
+              <span className="w-10 text-right font-mono text-xs tabular-nums">
                 {(weights[key] ?? 0).toFixed(2)}
               </span>
             </div>
@@ -311,15 +317,16 @@ export function SettingsPage() {
               onChange={(e) =>
                 setWeights((w) => ({ ...w, saturation_penalty_weight: Number(e.target.value) }))
               }
+              aria-label="Overexposure penalty"
               className="h-1.5 flex-1 accent-[var(--danger)]"
             />
-            <span className="w-10 text-right text-xs tabular-nums">
+            <span className="w-10 text-right font-mono text-xs tabular-nums">
               ×{(weights.saturation_penalty_weight ?? 0.25).toFixed(2)}
             </span>
           </div>
 
           <Button onClick={handleSaveWeights} disabled={savingWeights} size="sm">
-            {savingWeights ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {savingWeights ? <CircleNotchIcon className="size-4 animate-spin" /> : <FloppyDiskIcon className="size-4" />}
             Save weights
           </Button>
         </CardContent>
@@ -328,7 +335,7 @@ export function SettingsPage() {
       {/* AI model */}
       <Card>
         <CardHeader className="pb-2">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
+          <p className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
             AI model
             <HelpTip text="Requests walk the allowlist in fallback order when a model fails. Models marked offline are not served by the gateway right now and cannot be selected." />
           </p>
@@ -336,7 +343,7 @@ export function SettingsPage() {
         <CardContent className="space-y-3">
           {activeBroken ? (
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-warning">
-              <TriangleAlert className="size-3.5 shrink-0" />
+              <WarningIcon className="size-3.5 shrink-0" />
               <span>The active model is no longer working on the gateway.</span>
               {bestWorking ? (
                 <Button
@@ -352,7 +359,7 @@ export function SettingsPage() {
           ) : null}
 
           <Select value={model} onValueChange={handleModelChange}>
-            <SelectTrigger className="w-72">
+            <SelectTrigger className="w-72" aria-label="AI model">
               <SelectValue placeholder="Choose a model" />
             </SelectTrigger>
             <SelectContent>
@@ -375,7 +382,7 @@ export function SettingsPage() {
                       </Badge>
                     ) : null}
                     {m.source === 'auto' ? (
-                      <Badge variant="outline" className="px-1 py-0 text-[10px] text-primary">
+                      <Badge variant="outline" className="px-1 py-0 font-mono text-[10px] text-signal">
                         auto
                       </Badge>
                     ) : null}
@@ -403,7 +410,7 @@ export function SettingsPage() {
       {/* Model resilience */}
       <Card>
         <CardHeader className="pb-2">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
+          <p className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
             AI backup models
             <HelpTip text="If the active model fails, requests fall back to working models discovered from the gateway. The daily refresh probes candidates and keeps the 3 fastest working ones." />
           </p>
@@ -430,9 +437,9 @@ export function SettingsPage() {
               disabled={refreshing}
             >
               {refreshing ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <CircleNotchIcon className="size-3.5 animate-spin" />
               ) : (
-                <RefreshCw className="size-3.5" />
+                <ArrowsClockwiseIcon className="size-3.5" />
               )}
               Refresh now
             </Button>
@@ -454,7 +461,7 @@ export function SettingsPage() {
                     <span className="truncate text-muted-foreground">{m.id}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
-                    {m.latency_ms !== null ? <span className="tabular-nums">{m.latency_ms}ms</span> : null}
+                    {m.latency_ms !== null ? <span className="font-mono tabular-nums">{m.latency_ms}ms</span> : null}
                     {m.on_gateway ? (
                       <Badge variant="secondary" className="px-1 py-0 text-[10px]">
                         live
@@ -475,7 +482,7 @@ export function SettingsPage() {
       {/* Generation limits */}
       <Card>
         <CardHeader className="pb-2">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
+          <p className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
             AI usage limits
             <HelpTip text="Cost and safety controls for AI generation across the workspace." />
           </p>
@@ -492,12 +499,13 @@ export function SettingsPage() {
                 min={1}
                 value={limits[key] ?? ''}
                 onChange={(e) => setLimits((l) => ({ ...l, [key]: Number(e.target.value) }))}
-                className="h-8 w-24 text-sm"
+                aria-label={label}
+                className="h-8 w-24 font-mono text-sm"
               />
             </div>
           ))}
           <Button onClick={handleSaveLimits} disabled={savingLimits} size="sm">
-            {savingLimits ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {savingLimits ? <CircleNotchIcon className="size-4 animate-spin" /> : <FloppyDiskIcon className="size-4" />}
             Save limits
           </Button>
         </CardContent>
@@ -506,7 +514,7 @@ export function SettingsPage() {
       {/* Sources */}
       <Card>
         <CardHeader className="pb-2">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
+          <p className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
             Data sources
             <HelpTip text="Sources are fetched automatically every day. Disable one to stop using it without deleting existing items." />
           </p>
@@ -523,7 +531,7 @@ export function SettingsPage() {
                 className="flex items-center justify-between border-b py-2 last:border-0"
               >
                 <div>
-                  <p className="text-sm">{source.name}</p>
+                  <p className="text-sm font-medium">{source.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {source.items_count} items fetched
                   </p>

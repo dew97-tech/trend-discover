@@ -1,4 +1,4 @@
-import { CircleHelp } from 'lucide-react'
+import { QuestionIcon } from '@phosphor-icons/react'
 import {
   Tooltip,
   TooltipContent,
@@ -25,11 +25,11 @@ export function HelpTip({ text, side = 'top', className }: Props) {
           type="button"
           aria-label="More information"
           className={cn(
-            'inline-flex shrink-0 cursor-help text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:text-muted-foreground',
+            'inline-flex shrink-0 cursor-help rounded-sm text-muted-foreground/60 transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',
             className,
           )}
         >
-          <CircleHelp className="size-3.5" />
+          <QuestionIcon className="size-3.5" />
         </button>
       </TooltipTrigger>
       <TooltipContent side={side} sideOffset={6} className="max-w-64 text-xs leading-relaxed">

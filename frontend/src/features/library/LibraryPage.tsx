@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Library as LibraryIcon, MoreHorizontal } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { BooksIcon, CircleNotchIcon, DotsThreeIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,14 +39,15 @@ const TAB_FILTERS: Record<string, string> = {
 
 export function LibraryPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [posts, setPosts] = useState<ContentPost[] | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [tab, setTab] = useState('active')
-  const [format, setFormat] = useState('all')
-  const [search, setSearch] = useState('')
-  const [debounced, setDebounced] = useState('')
+  const tab = searchParams.get('tab') ?? 'active'
+  const [format, setFormat] = useState(() => searchParams.get('format') ?? 'all')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [debounced, setDebounced] = useState(() => searchParams.get('q') ?? '')
   const [pendingDelete, setPendingDelete] = useState<ContentPost | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -54,6 +55,22 @@ export function LibraryPage() {
     const timer = setTimeout(() => setDebounced(search), 350)
     return () => clearTimeout(timer)
   }, [search])
+
+  // Keep the filtered view linkable — tabs, style and search live in the URL.
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (tab !== 'active') params.set('tab', tab)
+    if (format !== 'all') params.set('format', format)
+    if (debounced) params.set('q', debounced)
+    setSearchParams(params, { replace: true })
+  }, [tab, format, debounced, setSearchParams])
+
+  function setTab(next: string) {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'active') params.delete('tab')
+    else params.set('tab', next)
+    setSearchParams(params, { replace: true })
+  }
 
   const filters = useMemo(
     () => ({
@@ -114,7 +131,7 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-6">
+    <div className="mx-auto max-w-[1200px] space-y-8 px-4 py-8 sm:px-6">
       <PageHeader
         title="Post Library"
         description="Every generated post — search, filter and update its status."
@@ -135,10 +152,12 @@ export function LibraryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search posts…"
+            aria-label="Search posts"
+            spellCheck={false}
             className="h-8 w-48 text-sm"
           />
           <Select value={format} onValueChange={setFormat}>
-            <SelectTrigger size="sm" className="w-44">
+            <SelectTrigger size="sm" className="w-44" aria-label="Filter by style">
               <SelectValue placeholder="Style" />
             </SelectTrigger>
             <SelectContent className="max-h-72">
@@ -154,14 +173,14 @@ export function LibraryPage() {
       </Toolbar>
 
       {!posts ? (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-36 rounded-lg" />
           ))}
         </div>
       ) : posts.length === 0 ? (
         <EmptyState
-          icon={LibraryIcon}
+          icon={BooksIcon}
           title="Nothing here yet"
           description="Generate a post from a trend and it will show up in this library."
           action={
@@ -172,7 +191,7 @@ export function LibraryPage() {
         />
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
               <PostCard
                 key={post.id}
@@ -187,7 +206,9 @@ export function LibraryPage() {
                 metaLeft={<span>v{post.version_count ?? 1}</span>}
                 metaRight={
                   <span>
-                    {new Date(post.updated_at ?? post.generated_at ?? Date.now()).toLocaleDateString()}
+                    {post.updated_at || post.generated_at
+                      ? new Date(post.updated_at ?? post.generated_at ?? 0).toLocaleDateString()
+                      : '—'}
                   </span>
                 }
                 actions={
@@ -199,7 +220,7 @@ export function LibraryPage() {
                         aria-label="Post actions"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MoreHorizontal className="size-4" />
+                        <DotsThreeIcon className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -228,7 +249,8 @@ export function LibraryPage() {
           {nextCursor ? (
             <div className="flex justify-center">
               <Button variant="outline" onClick={() => load(nextCursor)} disabled={loadingMore}>
-                {loadingMore ? 'Loading…' : 'Load more'}
+                {loadingMore ? <CircleNotchIcon className="size-4 animate-spin" /> : null}
+                Load more
               </Button>
             </div>
           ) : null}

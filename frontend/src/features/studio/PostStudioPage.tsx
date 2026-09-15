@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Loader2, MoreHorizontal, PenSquare, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  ArrowsClockwiseIcon,
+  CircleNotchIcon,
+  DotsThreeIcon,
+  MagnifyingGlassIcon,
+  NotePencilIcon,
+  SparkleIcon,
+  TrashIcon,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -48,13 +56,14 @@ interface PendingDelete {
 
 export function PostStudioPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [groups, setGroups] = useState<PostGroup[] | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [tab, setTab] = useState('active')
-  const [search, setSearch] = useState('')
-  const [debounced, setDebounced] = useState('')
+  const tab = searchParams.get('tab') ?? 'active'
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [debounced, setDebounced] = useState(() => searchParams.get('q') ?? '')
   const [pickerTrendId, setPickerTrendId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -63,6 +72,21 @@ export function PostStudioPage() {
     const timer = setTimeout(() => setDebounced(search), 350)
     return () => clearTimeout(timer)
   }, [search])
+
+  // Keep the filtered view linkable — tabs and search live in the URL.
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (tab !== 'active') params.set('tab', tab)
+    if (debounced) params.set('q', debounced)
+    setSearchParams(params, { replace: true })
+  }, [tab, debounced, setSearchParams])
+
+  function setTab(next: string) {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'active') params.delete('tab')
+    else params.set('tab', next)
+    setSearchParams(params, { replace: true })
+  }
 
   const filters = useMemo(
     () => ({
@@ -144,7 +168,7 @@ export function PostStudioPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-6">
+    <div className="mx-auto max-w-[1200px] space-y-8 px-4 py-8 sm:px-6">
       <PageHeader
         title="Post Studio"
         description="Every generated post, grouped under the trend it came from. Create one post per style, voice and angle — delete the ones you don't need."
@@ -155,7 +179,7 @@ export function PostStudioPage() {
             onClick={() => load()}
             title="Reload the list"
           >
-            <RefreshCw className="size-3.5" />
+            <ArrowsClockwiseIcon className="size-3.5" />
             Refresh
           </Button>
         }
@@ -172,11 +196,13 @@ export function PostStudioPage() {
         </Tabs>
 
         <div className="relative w-56">
-          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search posts…"
+            aria-label="Search posts"
+            spellCheck={false}
             className="h-8 pl-8 text-sm"
           />
         </div>
@@ -190,7 +216,7 @@ export function PostStudioPage() {
         </div>
       ) : groups.length === 0 ? (
         <EmptyState
-          icon={PenSquare}
+          icon={NotePencilIcon}
           title="No posts here yet"
           description={
             tab === 'active'
@@ -205,7 +231,7 @@ export function PostStudioPage() {
         />
       ) : (
         <>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {groups.map((group) => (
               <TrendGroupCard
                 key={group.trend.id}
@@ -233,7 +259,7 @@ export function PostStudioPage() {
           {nextCursor ? (
             <div className="flex justify-center">
               <Button variant="outline" onClick={() => load(nextCursor)} disabled={loadingMore}>
-                {loadingMore ? <Loader2 className="size-4 animate-spin" /> : null}
+                {loadingMore ? <CircleNotchIcon className="size-4 animate-spin" /> : null}
                 Load more
               </Button>
             </div>
@@ -292,19 +318,19 @@ function TrendGroupCard({
 }: GroupCardProps) {
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <ScorePill score={group.trend.trend_score} />
               <p className="min-w-0 text-sm font-medium leading-snug">{group.trend.title}</p>
               {group.trend.hack_style ? (
-                <Badge variant="outline" className="text-[10px] text-primary">
-                  practical tip
+                <Badge variant="outline" className="font-mono text-[10px] text-signal">
+                  tip
                 </Badge>
               ) : null}
               {group.trend.deleted ? (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="font-mono text-[10px]">
                   trend removed
                 </Badge>
               ) : null}
@@ -320,17 +346,18 @@ function TrendGroupCard({
 
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="outline" onClick={onNewVariant}>
-              <Plus className="size-3.5" />
+              <SparkleIcon className="size-3.5" />
               Generate another post
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon-sm" aria-label="Trend actions">
-                  <MoreHorizontal className="size-4" />
+                  <DotsThreeIcon className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem variant="destructive" onClick={onDeleteGroup}>
+                  <TrashIcon className="size-4" />
                   Delete all posts
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -343,12 +370,12 @@ function TrendGroupCard({
         {group.posts.map((post) => (
           <div
             key={post.id}
-            className="group flex items-center gap-3 rounded-md border px-3 py-2 transition-colors hover:border-primary/40"
+            className="group flex items-center gap-3 rounded-md border border-border px-3 py-2 transition-colors duration-150 hover:border-border-strong"
           >
             <button
               type="button"
               onClick={() => onOpen(post.id)}
-              className="min-w-0 flex-1 text-left"
+              className="min-w-0 flex-1 rounded-sm text-left focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
             >
               <p className="truncate text-sm font-medium">
                 {(post.hook ?? post.title ?? '(untitled)').trim()}
@@ -365,7 +392,7 @@ function TrendGroupCard({
             {post.quality_score !== null ? (
               <span
                 className={cn(
-                  'shrink-0 text-xs font-semibold tabular-nums',
+                  'shrink-0 font-mono text-xs font-semibold tabular-nums',
                   post.quality_score >= 80 && 'text-success',
                   post.quality_score < 60 && 'text-danger',
                 )}
@@ -384,7 +411,7 @@ function TrendGroupCard({
               className="text-muted-foreground hover:text-danger"
               onClick={() => onDeletePost(post)}
             >
-              <Trash2 className="size-3.5" />
+              <TrashIcon className="size-3.5" />
             </Button>
           </div>
         ))}

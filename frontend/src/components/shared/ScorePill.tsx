@@ -13,7 +13,7 @@ export function ScorePill({ score, className, precise = false }: Props) {
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums',
+        'inline-flex shrink-0 items-center rounded-sm px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums',
         SCORE_TIER_CLASS[scoreTier(score)],
         className,
       )}

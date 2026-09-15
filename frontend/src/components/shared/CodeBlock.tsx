@@ -11,9 +11,9 @@ interface Props {
 /** Read-only monospace block for logs and snippets that should wrap, never clip. */
 export function CodeBlock({ code, label, maxHeightClass = 'max-h-72', className }: Props) {
   return (
-    <div className={cn('overflow-hidden rounded-md border bg-surface-muted', className)}>
+    <div className={cn('overflow-hidden rounded-lg border border-border bg-surface-sunken', className)}>
       {label ? (
-        <div className="border-b px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+        <div className="border-b border-border px-3 py-1.5 font-mono text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
           {label}
         </div>
       ) : null}

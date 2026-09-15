@@ -349,8 +349,9 @@ src/features/trends/    TrendExplorerPage (filters, cards, detail dialog, cursor
 src/lib/api.ts          fetch wrapper: bearer token, JSON errors, 401 → clearSession+event
 ```
 
-Design tokens (`src/index.css`): semantic CSS variables mapped from the LinkedIn-inspired
-palette; light+dark; tier colors `--trend-high/medium/low` used for score badges.
+Design system: `frontend/DESIGN.md` (Signal Desk) is the source of truth. Tokens live in
+`src/index.css` — cool paper/ink surfaces, one `--signal` accent, pastel status pairs,
+light + dark; tier colors `--score-high/medium/low` drive score badges.
 
 ## 8. Monitoring
 
@@ -485,20 +486,24 @@ same fixed-size node scaled by a `ResizeObserver`, not a reflow. **Copy image** 
 2x PNG to the clipboard (`toBlob` + `ClipboardItem`) for direct pasting into LinkedIn;
 PNG download remains. Pending generations render a fixed-aspect skeleton, so nothing jumps.
 
-## 11. UI Design System
+## 11. UI Design System ("Signal Desk")
 
-Semantic tokens (`index.css`) on a cool neutral base with one brand accent; borders over
-shadows; light + dark via `next-themes`. The sidebar and mobile top bar carry a one-click
-sun/moon toggle (`components/layout/ThemeToggle.tsx`), and the user menu still offers
-Light / Dark / System. The desktop sidebar collapses to a 16px icon rail
-(`PanelLeftClose/Open`, persisted as `td_shell_sidebar_collapsed` in `localStorage`) —
-collapsed links keep `title` tooltips and the avatar-only account menu still exposes the
-theme switcher. Shared primitives live in
-`components/shared/` (`PageHeader`, `SectionHeader`, `EmptyState`, `StatusBadge`,
-`ScorePill`, `StatTile`, `Field`, `HelpTip`, `ConfirmDialog`, `CodeBlock`, `Toolbar`,
-`PostCard`). Formats and statuses are single-source modules (`lib/content-formats.ts`,
-`lib/post-status.ts`) instead of duplicated maps. Non-obvious controls carry a `HelpTip`;
-the app-level `TooltipProvider` supplies shared timing.
+`frontend/DESIGN.md` is the source of truth. Shape: cool paper canvas (`#f2f4f7`) and
+tinted ink, hairline borders over shadows, a single `--signal` LinkedIn-blue accent for
+links/focus/live data, and pastel status pairs. Type: Geist for UI, Newsreader for page
+titles and hero statements, JetBrains Mono for numbers and meta — `index.css` holds the
+full token set for both themes.
+
+Shell: a 56px sticky top bar with a ⌘K command palette (`layout/CommandPalette.tsx`)
+replaces the old sidebar; mobile navigation is a Radix dialog, and a skip link targets
+`#main-content`. Icons are Phosphor (bold weight via `IconContext`) — Lucide is removed.
+Shared primitives live in `components/shared/` (`PageHeader`, `SectionHeader`,
+`EmptyState`, `StatusBadge`, `ScorePill`, `StatTile` — a hairline metric readout,
+`Field`, `HelpTip`, `ConfirmDialog`, `CodeBlock`, `Toolbar`, `PostCard`). Formats and
+statuses stay single-source (`lib/content-formats.ts`, `lib/post-status.ts`,
+`lib/labels.ts`). Lists keep filters and tabs linkable through `useSearchParams`.
+Reduced motion, focus-visible rings, labeled controls and keyboard-operable rows are
+part of the baseline, not extras.
 
 ## 12. What Comes Next
 

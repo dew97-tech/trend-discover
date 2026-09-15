@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -23,7 +23,8 @@ interface Props {
 /**
  * Shared post card used by Studio list, Library grid and Overview sections.
  * `actions` renders in the header (e.g. status menu); `metaLeft`/`metaRight`
- * render in the footer meta row.
+ * render in the footer meta row. When `onClick` is set the card becomes a
+ * keyboard-operable button.
  */
 export function PostCard({
   title,
@@ -38,18 +39,32 @@ export function PostCard({
   actions,
   onClick,
 }: Props) {
+  const headline = (hook ?? title ?? '(untitled)').trim()
+  const interactive = Boolean(onClick)
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onClick?.()
+  }
+
   return (
     <Card
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? headline : undefined}
       onClick={onClick}
+      onKeyDown={interactive ? handleKeyDown : undefined}
       className={cn(
-        'border shadow-none transition-colors',
-        onClick && 'cursor-pointer hover:border-primary/40',
+        'gap-3 transition-colors duration-150',
+        interactive &&
+          'cursor-pointer hover:border-signal/50 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none',
       )}
     >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <Badge variant="outline" className="font-normal">
+            <Badge variant="outline" className="font-mono text-[10px] tracking-wide">
               {contentFormatLabel(format)}
             </Badge>
             {tone ? (
@@ -62,7 +77,7 @@ export function PostCard({
           </div>
         </div>
         <p className="line-clamp-2 pt-1.5 text-sm font-medium leading-snug">
-          {(hook ?? title ?? '(untitled)').trim()}
+          {headline}
         </p>
       </CardHeader>
       <CardContent className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -77,7 +92,7 @@ export function PostCard({
               Quality{' '}
               <strong
                 className={cn(
-                  'tabular-nums',
+                  'font-mono tabular-nums',
                   qualityScore >= 80 && 'text-success',
                   qualityScore < 60 && 'text-danger',
                 )}

@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, Loader2, Sparkles, Wand2, X } from 'lucide-react'
+import {
+  CaretDownIcon,
+  CheckIcon,
+  CircleNotchIcon,
+  MagicWandIcon,
+  SparkleIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -154,10 +161,10 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
   const charDelta = ready ? suggested.length - current.length : null
 
   return (
-    <div className="space-y-3 rounded-lg border border-dashed bg-surface-muted/40 p-3">
+    <div className="space-y-3 rounded-lg border border-dashed border-border-strong bg-surface-muted/40 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-medium">
-          <Wand2 className="size-3.5 text-primary" />
+          <MagicWandIcon className="size-3.5 text-signal" />
           Suggest improvement for the {TARGET_LABEL[target]}
         </p>
         <Button
@@ -166,7 +173,7 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
           aria-label="Close suggestion panel"
           onClick={onDismiss}
         >
-          <X className="size-3.5" />
+          <XIcon className="size-3.5" />
         </Button>
       </div>
 
@@ -178,7 +185,7 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
             {charDelta !== null ? (
               <span
                 className={cn(
-                  'rounded-full border px-1.5 py-0.5 text-[11px] tabular-nums',
+                  'rounded-sm border px-1.5 py-0.5 font-mono text-[11px] tabular-nums',
                   charDelta === 0
                     ? 'text-muted-foreground'
                     : charDelta > 0
@@ -213,7 +220,7 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => setShowCurrent((v) => !v)}
           >
-            <ChevronDown className={cn('size-3 transition-transform', showCurrent && 'rotate-180')} />
+            <CaretDownIcon className={cn('size-3 transition-transform', showCurrent && 'rotate-180')} />
             {showCurrent ? 'Hide current version' : 'Compare with current version'}
           </button>
 
@@ -225,7 +232,7 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
 
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={() => void handleApply()} disabled={applying}>
-              {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+              {applying ? <CircleNotchIcon className="size-3.5 animate-spin" /> : <CheckIcon className="size-3.5" />}
               Apply to post
             </Button>
             <Button
@@ -246,7 +253,7 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
       {/* Pending proposal */}
       {pending ? (
         <p className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" />
+          <CircleNotchIcon className="size-3.5 animate-spin" />
           AI is revising the {TARGET_LABEL[target]} — you can keep editing while it works.
         </p>
       ) : null}
@@ -274,7 +281,7 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => setShowReference((v) => !v)}
           >
-            <ChevronDown className={cn('size-3 transition-transform', showReference && 'rotate-180')} />
+            <CaretDownIcon className={cn('size-3 transition-transform', showReference && 'rotate-180')} />
             {showReference ? 'Hide reference version' : 'Paste a reference version (optional)'}
           </button>
 
@@ -291,9 +298,9 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={() => void handleSubmit()} disabled={submitting}>
               {submitting ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <CircleNotchIcon className="size-3.5 animate-spin" />
               ) : (
-                <Sparkles className="size-3.5" />
+                <SparkleIcon className="size-3.5" />
               )}
               Get suggestion
             </Button>
@@ -307,12 +314,12 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
       {/* History */}
       {history.length > 0 ? (
         <div className="space-y-1.5 border-t pt-2.5">
-          <p className="text-[11px] font-medium text-muted-foreground">Previous suggestions</p>
+          <p className="font-mono text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">Previous suggestions</p>
           {history.slice(0, 5).map((revision) => (
             <div key={revision.id} className="flex items-center gap-2 text-[11px]">
               <span
                 className={cn(
-                  'shrink-0 rounded-full border px-1.5 py-0.5',
+                  'shrink-0 rounded-sm border px-1.5 py-0.5',
                   revision.status === 'applied' ? 'text-success' : 'text-muted-foreground',
                 )}
               >
@@ -328,7 +335,7 @@ export function RevisionPanel({ postId, target, onApplied, onDismiss, beforeSubm
 
       {loading ? (
         <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" />
+          <CircleNotchIcon className="size-3 animate-spin" />
           Loading suggestions…
         </p>
       ) : null}

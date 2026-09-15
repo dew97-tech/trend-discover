@@ -1,13 +1,19 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CircleNotchIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { BrandMark } from '@/components/layout/BrandMark'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { ApiError } from '@/lib/api'
+
+const SIGNALS = [
+  'Six sources, collected continuously',
+  'Scored for novelty and usefulness',
+  'Posts drafted from the research',
+]
 
 export function RegisterPage() {
   const { user, register } = useAuth()
@@ -45,18 +51,50 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-sm py-6">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-            TD
+    <div className="grid min-h-svh lg:grid-cols-[1.05fr_1fr]">
+      <aside className="hidden flex-col justify-between border-r border-border bg-surface p-10 lg:flex">
+        <div className="flex items-center gap-2.5">
+          <BrandMark />
+          <span className="font-semibold tracking-tight">Trend Discover</span>
+        </div>
+
+        <div className="space-y-4">
+          <p className="max-w-md font-serif text-4xl leading-[1.08] font-medium tracking-tight">
+            Find what is worth discussing, before it is everywhere.
+          </p>
+          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+            The workspace ranks incoming engineering stories, groups them into trends, and
+            drafts posts grounded in the sources behind them.
+          </p>
+        </div>
+
+        <ul className="space-y-2">
+          {SIGNALS.map((signal) => (
+            <li
+              key={signal}
+              className="font-mono text-[11px] tracking-[0.06em] text-muted-foreground uppercase"
+            >
+              {signal}
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <main className="flex items-center justify-center px-4 py-10 sm:px-6">
+        <div className="w-full max-w-sm space-y-7">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5 lg:hidden">
+              <BrandMark />
+              <span className="font-semibold tracking-tight">Trend Discover</span>
+            </div>
+            <h1 className="pt-2 font-serif text-2xl font-medium tracking-tight">
+              Create your account
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Sessions last 60 minutes. Your drafts are shared with the workspace.
+            </p>
           </div>
-          <CardTitle className="text-xl tracking-tight">Create your account</CardTitle>
-          <CardDescription>
-            Discover engineering trends worth sharing. Sessions last 60 minutes.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
@@ -75,6 +113,7 @@ export function RegisterPage() {
                 id="email"
                 type="email"
                 required
+                spellCheck={false}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
@@ -112,19 +151,19 @@ export function RegisterPage() {
             ) : null}
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              {submitting ? <CircleNotchIcon className="size-4 animate-spin" /> : null}
               Create account
             </Button>
 
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Already have an account?{' '}
-              <Link to="/login" className="font-medium text-primary hover:underline">
+              <Link to="/login" className="font-medium text-signal hover:underline">
                 Sign in
               </Link>
             </p>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </main>
     </div>
   )
 }

@@ -13,7 +13,7 @@ export function SectionHeader({ title, description, help, actions }: Props) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0 space-y-0.5">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
           {title}
           {help}
         </h2>

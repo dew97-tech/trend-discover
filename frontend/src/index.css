@@ -3,108 +3,155 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Trend Discover — Design tokens
+ * Trend Discover — Signal Desk design system
  *
- * Direction: cool neutral surfaces, one brand accent, borders over shadows.
+ * Direction: cool paper and ink, one signal accent, hairlines over cards.
+ * Type: Geist (UI) / Newsreader (editorial display) / JetBrains Mono (data).
  * Colors are semantic: reach for a token, never a raw hex, in components.
  * Light + dark are both first-class (next-themes toggles the `.dark` class).
  */
 
 :root {
-  /* Surfaces */
-  --background: #f7f8fa;
-  --foreground: #16181d;
-  --surface: #ffffff;
-  --surface-muted: #f1f3f6;
-  --card: #ffffff;
-  --card-foreground: #16181d;
-  --popover: #ffffff;
-  --popover-foreground: #16181d;
+  color-scheme: light;
 
-  /* Brand */
-  --primary: #0a66c2;
+  /* Surfaces */
+  --background: #f2f4f7;
+  --foreground: #15181d;
+  --surface: #ffffff;
+  --surface-muted: #e9edf2;
+  --surface-sunken: #eef1f5;
+  --card: #ffffff;
+  --card-foreground: #15181d;
+  --popover: #ffffff;
+  --popover-foreground: #15181d;
+
+  /* Ink action + signal accent */
+  --primary: #15181d;
   --primary-foreground: #ffffff;
-  --primary-hover: #084d92;
-  --accent: #e8f0fb;
-  --accent-foreground: #084d92;
+  --primary-hover: #2b313b;
+  --signal: #0a66c2;
+  --signal-foreground: #ffffff;
+  --signal-soft: #e4effa;
 
   /* Neutrals */
-  --secondary: #eef0f3;
-  --secondary-foreground: #333a45;
-  --muted: #eef0f3;
-  --muted-foreground: #667085;
-  --border: #e3e6ea;
-  --input: #d8dce2;
+  --secondary: #e6eaef;
+  --secondary-foreground: #303742;
+  --muted: #e6eaef;
+  --muted-foreground: #5b6472;
+  --accent: #e9edf2;
+  --accent-foreground: #15181d;
+  --border: #dde2e9;
+  --border-strong: #c9d0d9;
+  --input: #c9d0d9;
   --ring: #0a66c2;
 
   /* Destructive */
-  --destructive: #c62f2f;
+  --destructive: #9f2f2d;
   --destructive-foreground: #ffffff;
 
   /* Status */
-  --success: #12805c;
-  --success-soft: #e2f3ec;
-  --warning: #b54708;
-  --warning-soft: #fdeed8;
-  --danger: #c62f2f;
-  --danger-soft: #fbe9e7;
-  --info: #0a66c2;
-  --info-soft: #e8f0fb;
+  --success: #346538;
+  --success-soft: #edf3ec;
+  --warning: #956400;
+  --warning-soft: #fbf3db;
+  --danger: #9f2f2d;
+  --danger-soft: #fdebec;
+  --info: #1f6c9f;
+  --info-soft: #e1f3fe;
 
   /* Score tiers */
-  --score-high: #12805c;
-  --score-medium: #b54708;
-  --score-low: #915907;
+  --score-high: #346538;
+  --score-high-soft: #edf3ec;
+  --score-medium: #956400;
+  --score-medium-soft: #fbf3db;
+  --score-low: #9f2f2d;
+  --score-low-soft: #fdebec;
+
+  /* Code surfaces — stay dark in both themes */
+  --code: #0d1117;
+  --code-foreground: #e6edf3;
+  --code-border: #232a33;
+
+  /* Elevation — overlays only, tinted to the ink rather than pure black */
+  --shadow-overlay: 0 18px 40px -24px rgb(21 24 29 / 0.35);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+
+  /* Layering */
+  --z-sticky: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
 
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: #0b0d10;
-  --foreground: #e9ecf1;
-  --surface: #14171c;
-  --surface-muted: #1b1f26;
-  --card: #14171c;
-  --card-foreground: #e9ecf1;
-  --popover: #171b21;
-  --popover-foreground: #e9ecf1;
+  color-scheme: dark;
 
-  --primary: #4d9fe0;
-  --primary-foreground: #08131f;
-  --primary-hover: #6cb0e8;
-  --accent: #1c2a3d;
-  --accent-foreground: #bcd8f5;
+  --background: #0e1013;
+  --foreground: #e6e9ee;
+  --surface: #16191e;
+  --surface-muted: #1d2127;
+  --surface-sunken: #111317;
+  --card: #16191e;
+  --card-foreground: #e6e9ee;
+  --popover: #1a1e24;
+  --popover-foreground: #e6e9ee;
 
-  --secondary: #1f242c;
-  --secondary-foreground: #d7dce3;
-  --muted: #232931;
+  --primary: #e6e9ee;
+  --primary-foreground: #12151a;
+  --primary-hover: #c9ced6;
+  --signal: #6ba6e8;
+  --signal-foreground: #0b1520;
+  --signal-soft: #16283c;
+
+  --secondary: #22272f;
+  --secondary-foreground: #d3d8e0;
+  --muted: #22272f;
   --muted-foreground: #98a2b3;
-  --border: #262c35;
-  --input: #2c333d;
-  --ring: #4d9fe0;
+  --accent: #22272f;
+  --accent-foreground: #e6e9ee;
+  --border: #272d36;
+  --border-strong: #39414c;
+  --input: #39414c;
+  --ring: #6ba6e8;
 
-  --destructive: #e0554b;
+  --destructive: #e08583;
   --destructive-foreground: #1a0d0c;
 
-  --success: #4fb286;
-  --success-soft: #16281f;
-  --warning: #e0a458;
-  --warning-soft: #33270f;
-  --danger: #e0554b;
-  --danger-soft: #331a17;
-  --info: #4d9fe0;
-  --info-soft: #16263a;
+  --success: #7fbb8a;
+  --success-soft: #16251a;
+  --warning: #d9b25f;
+  --warning-soft: #2a2312;
+  --danger: #e08583;
+  --danger-soft: #2c1919;
+  --info: #7db3df;
+  --info-soft: #152433;
 
-  --score-high: #4fb286;
-  --score-medium: #e0a458;
-  --score-low: #c07d1f;
+  --score-high: #7fbb8a;
+  --score-high-soft: #16251a;
+  --score-medium: #d9b25f;
+  --score-medium-soft: #2a2312;
+  --score-low: #e08583;
+  --score-low-soft: #2c1919;
+
+  --shadow-overlay: 0 18px 40px -24px rgb(0 0 0 / 0.7);
 }
 
 @theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -112,6 +159,9 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-soft: var(--signal-soft);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -121,6 +171,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
@@ -134,13 +185,22 @@
   --color-info-soft: var(--info-soft);
 
   --color-score-high: var(--score-high);
+  --color-score-high-soft: var(--score-high-soft);
   --color-score-medium: var(--score-medium);
+  --color-score-medium-soft: var(--score-medium-soft);
   --color-score-low: var(--score-low);
+  --color-score-low-soft: var(--score-low-soft);
+
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-border: var(--code-border);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-overlay: var(--shadow-overlay);
 }
 
 @layer base {
@@ -148,27 +208,69 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    font-family:
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      "Segoe UI",
-      Roboto,
-      "Helvetica Neue",
-      Arial,
-      sans-serif;
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11";
+    text-rendering: optimizeLegibility;
   }
 
   code,
   pre,
-  kbd {
-    font-family:
-      "JetBrains Mono",
-      ui-monospace,
-      "Cascadia Code",
-      Consolas,
-      monospace;
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--signal-soft);
+    color: var(--foreground);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.route-enter {
+  animation: rise-in var(--duration-base) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-enter {
+    animation: none;
   }
 }

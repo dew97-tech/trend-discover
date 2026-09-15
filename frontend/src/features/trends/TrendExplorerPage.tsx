@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, Radar, RefreshCw, Sparkles, Target, Wrench } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import {
+  ArrowsClockwiseIcon,
+  CircleNotchIcon,
+  CrosshairIcon,
+  MagnifyingGlassIcon,
+  SparkleIcon,
+  TargetIcon,
+  WrenchIcon,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +61,7 @@ const FOCUS_CHIPS = [
 ]
 
 export function TrendExplorerPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [trends, setTrends] = useState<Trend[]>([])
   const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null)
   const [loading, setLoading] = useState(true)
@@ -59,14 +69,14 @@ export function TrendExplorerPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [categoryId, setCategoryId] = useState('all')
-  const [technologyId, setTechnologyId] = useState<string | null>(null)
-  const [focusOnly, setFocusOnly] = useState(false)
-  const [minScore, setMinScore] = useState('0')
-  const [dateRange, setDateRange] = useState('14')
-  const [workflowStatus, setWorkflowStatus] = useState('all')
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '')
+  const [categoryId, setCategoryId] = useState(() => searchParams.get('category') ?? 'all')
+  const [technologyId, setTechnologyId] = useState<string | null>(() => searchParams.get('tech'))
+  const [focusOnly, setFocusOnly] = useState(() => searchParams.get('focus') === '1')
+  const [minScore, setMinScore] = useState(() => searchParams.get('min') ?? '0')
+  const [dateRange, setDateRange] = useState(() => searchParams.get('range') ?? '14')
+  const [workflowStatus, setWorkflowStatus] = useState(() => searchParams.get('status') ?? 'all')
 
   const [selected, setSelected] = useState<TrendDetail | null>(null)
   const [rescoring, setRescoring] = useState(false)
@@ -83,6 +93,28 @@ export function TrendExplorerPage() {
   useEffect(() => {
     fetchTaxonomy().then(setTaxonomy).catch(() => null)
   }, [])
+
+  // Keep the filtered view linkable — every filter lives in the URL.
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (debouncedSearch) params.set('q', debouncedSearch)
+    if (categoryId !== 'all') params.set('category', categoryId)
+    if (technologyId) params.set('tech', technologyId)
+    if (focusOnly) params.set('focus', '1')
+    if (minScore !== '0') params.set('min', minScore)
+    if (dateRange !== '14') params.set('range', dateRange)
+    if (workflowStatus !== 'all') params.set('status', workflowStatus)
+    setSearchParams(params, { replace: true })
+  }, [
+    debouncedSearch,
+    categoryId,
+    technologyId,
+    focusOnly,
+    minScore,
+    dateRange,
+    workflowStatus,
+    setSearchParams,
+  ])
 
   const filters = useMemo(
     () => ({
@@ -186,13 +218,13 @@ export function TrendExplorerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
+    <div className="mx-auto max-w-[1200px] space-y-8 px-4 py-8 sm:px-6">
       <PageHeader
         title="Trends"
         description="Stories grouped across all sources, ranked by your scoring setup."
         actions={
           <Button variant="outline" size="sm" onClick={load}>
-            <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
+            <ArrowsClockwiseIcon className={cn('size-3.5', loading && 'animate-spin')} />
             Refresh
           </Button>
         }
@@ -200,17 +232,19 @@ export function TrendExplorerPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-56 flex-1">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search trends…"
+            aria-label="Search trends"
+            spellCheck={false}
             className="pl-9"
           />
         </div>
 
         <Select value={categoryId} onValueChange={setCategoryId}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-48" aria-label="Category">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -224,7 +258,7 @@ export function TrendExplorerPage() {
         </Select>
 
         <Select value={minScore} onValueChange={setMinScore}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" aria-label="Minimum score">
             <SelectValue placeholder="Min score" />
           </SelectTrigger>
           <SelectContent>
@@ -236,7 +270,7 @@ export function TrendExplorerPage() {
         </Select>
 
         <Select value={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" aria-label="Date range">
             <SelectValue placeholder="Date range" />
           </SelectTrigger>
           <SelectContent>
@@ -249,7 +283,7 @@ export function TrendExplorerPage() {
         </Select>
 
         <Select value={workflowStatus} onValueChange={setWorkflowStatus}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-36" aria-label="Workflow status">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -270,7 +304,7 @@ export function TrendExplorerPage() {
           onClick={() => setFocusOnly((v) => !v)}
           title="Only show trends matching your focus topics (Laravel, PHP/TS, React, Next.js, databases)"
         >
-          <Target className="size-3.5" />
+          <TargetIcon className="size-3.5" />
           Focus topics
         </Button>
         {FOCUS_CHIPS.map((chip) => {
@@ -293,85 +327,79 @@ export function TrendExplorerPage() {
       </div>
 
       {error ? (
-        <div className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+        <div className="rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
           {error}
         </div>
       ) : null}
 
       {loading ? (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-2">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-40 rounded-lg" />
+            <Skeleton key={i} className="h-14 rounded-lg" />
           ))}
         </div>
       ) : trends.length === 0 ? (
         <EmptyState
-          icon={Radar}
+          icon={CrosshairIcon}
           title="No trends match these filters"
           description="Try widening the date range, clearing the focus toggle, or lowering the minimum score."
         />
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {trends.map((trend) => (
-              <Card
-                key={trend.id}
-                onClick={() => openDetail(trend)}
-                className="cursor-pointer transition-colors hover:border-primary/40"
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">
-                        {trend.category?.name ?? 'General'}
-                      </span>
-                      {trend.hack_style ? (
-                        <Badge variant="outline" className="gap-1 text-[10px] text-primary">
-                          <Wrench className="size-3" />
-                          practical tip
-                        </Badge>
-                      ) : null}
-                      <span
-                        className={cn(
-                          'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
-                          trendWorkflowMeta(trend.workflow_status).className,
-                        )}
-                      >
-                        {trendWorkflowMeta(trend.workflow_status).label}
-                      </span>
-                    </div>
+          <Card>
+            <CardContent className="divide-y divide-border p-0">
+              {trends.map((trend) => {
+                const workflow = trendWorkflowMeta(trend.workflow_status)
+
+                return (
+                  <button
+                    key={trend.id}
+                    type="button"
+                    onClick={() => openDetail(trend)}
+                    className="flex w-full items-center gap-4 px-4 py-3 text-left transition-colors duration-150 hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
+                  >
                     <ScorePill score={trend.scores.trend} />
-                  </div>
-                  <p className="line-clamp-2 pt-1 text-sm font-medium leading-snug">
-                    {trend.title}
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {trend.technologies && trend.technologies.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {trend.technologies.slice(0, 4).map((tech) => (
-                        <Badge key={tech.id} variant="outline" className="px-1.5 py-0 text-[10px]">
-                          {tech.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>
-                      {trend.item_count} mention{trend.item_count === 1 ? '' : 's'}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{trend.title}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {trend.category?.name ?? 'General'}
+                        {trend.technologies && trend.technologies.length > 0
+                          ? ` · ${trend.technologies
+                              .slice(0, 4)
+                              .map((tech) => tech.name)
+                              .join(' · ')}`
+                          : ''}
+                        {' · '}
+                        {trend.item_count} mention{trend.item_count === 1 ? '' : 's'}
+                      </span>
                     </span>
-                    <span>originality {Math.round(trend.scores.novelty)}</span>
-                    <span>overexposure {Math.round(trend.scores.saturation)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    {trend.hack_style ? (
+                      <span className="hidden shrink-0 items-center gap-1 font-mono text-[10px] tracking-[0.08em] text-signal uppercase sm:flex">
+                        <WrenchIcon className="size-3" />
+                        tip
+                      </span>
+                    ) : null}
+                    <span className="hidden shrink-0 font-mono text-xs tabular-nums text-muted-foreground lg:block">
+                      novelty {Math.round(trend.scores.novelty)}
+                    </span>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase',
+                        workflow.className,
+                      )}
+                    >
+                      {workflow.label}
+                    </span>
+                  </button>
+                )
+              })}
+            </CardContent>
+          </Card>
 
           {nextCursor ? (
             <div className="flex justify-center">
               <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? <RefreshCw className="size-4 animate-spin" /> : null}
+                {loadingMore ? <CircleNotchIcon className="size-4 animate-spin" /> : null}
                 Load more
               </Button>
             </div>
@@ -401,7 +429,7 @@ export function TrendExplorerPage() {
               </DialogHeader>
 
               {/* Manual workflow state — never touched by automation */}
-              <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b pb-3">
+              <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border pb-3">
                 <span className="mr-1 text-xs text-muted-foreground">Status</span>
                 {TREND_WORKFLOW_STATUS_KEYS.map((key) => {
                   const meta = trendWorkflowMeta(key)
@@ -423,7 +451,7 @@ export function TrendExplorerPage() {
               </div>
 
               {/* Scrollable body — header + actions stay pinned */}
-              <div className="-mx-1 flex-1 space-y-5 overflow-y-auto px-1">
+              <div className="-mx-1 flex-1 space-y-5 overflow-y-auto overscroll-contain px-1">
                 {selected.summary ? (
                   <p className="text-sm leading-relaxed [overflow-wrap:anywhere] text-muted-foreground">
                     {selected.summary}
@@ -431,7 +459,9 @@ export function TrendExplorerPage() {
                 ) : null}
 
                 <section className="space-y-2">
-                  <h3 className="text-sm font-semibold">Score details</h3>
+                  <h3 className="font-mono text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                    Score details
+                  </h3>
                   {(
                     [
                       ['freshness', selected.scores.freshness],
@@ -448,8 +478,8 @@ export function TrendExplorerPage() {
                         {SCORE_LABELS[key]}
                         <HelpTip text={TREND_SCORE_HELP[key]} />
                       </span>
-                      <Progress value={value} className="h-2 min-w-0 flex-1" />
-                      <span className="w-9 shrink-0 text-right text-xs tabular-nums">
+                      <Progress value={value} className="min-w-0 flex-1" />
+                      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums">
                         {Math.round(value)}
                       </span>
                     </div>
@@ -458,12 +488,14 @@ export function TrendExplorerPage() {
 
                 {selected.sources.length > 0 ? (
                   <section className="space-y-2">
-                    <h3 className="text-sm font-semibold">Sources covering this</h3>
+                    <h3 className="font-mono text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                      Sources covering this
+                    </h3>
                     <ul className="space-y-1.5">
                       {selected.sources.slice(0, 8).map((source, i) => (
                         <li key={i} className="flex min-w-0 items-center justify-between gap-2 text-xs">
                           <span className="flex min-w-0 items-center truncate text-muted-foreground">
-                            <Badge variant="outline" className="mr-1.5 shrink-0 px-1 py-0 text-[10px]">
+                            <Badge variant="outline" className="mr-1.5 shrink-0 px-1 py-0 font-mono text-[10px]">
                               {source.source ?? '?'}
                             </Badge>
                             <span
@@ -473,7 +505,7 @@ export function TrendExplorerPage() {
                               {source.title ?? '(untitled)'}
                             </span>
                           </span>
-                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                          <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
                             {source.metrics.points ??
                               source.metrics.stars ??
                               source.metrics.score ??
@@ -487,10 +519,10 @@ export function TrendExplorerPage() {
                 ) : null}
               </div>
 
-              <div className="flex shrink-0 items-center justify-between gap-2 border-t pt-3">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border pt-3">
                 <button
                   type="button"
-                  className="text-xs text-muted-foreground hover:text-danger disabled:opacity-50"
+                  className="text-xs text-muted-foreground transition-colors duration-150 hover:text-danger disabled:opacity-50"
                   disabled={deleting}
                   onClick={() => setConfirmDelete(true)}
                 >
@@ -498,11 +530,11 @@ export function TrendExplorerPage() {
                 </button>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleRescore} disabled={rescoring}>
-                    <RefreshCw className={cn('size-3.5', rescoring && 'animate-spin')} />
+                    <ArrowsClockwiseIcon className={cn('size-3.5', rescoring && 'animate-spin')} />
                     Refresh score
                   </Button>
                   <Button size="sm" onClick={() => setPickerOpen(true)}>
-                    <Sparkles className="size-3.5" />
+                    <SparkleIcon className="size-3.5" />
                     Generate post
                   </Button>
                 </div>
@@ -510,7 +542,7 @@ export function TrendExplorerPage() {
             </>
           ) : (
             <div className="flex justify-center p-8">
-              <RefreshCw className="size-6 animate-spin text-muted-foreground" />
+              <CircleNotchIcon className="size-6 animate-spin text-muted-foreground" />
             </div>
           )}
         </DialogContent>

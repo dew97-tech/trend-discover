@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, ChevronDown, ChevronRight, Loader2, Play, RefreshCw } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import {
+  ArrowsClockwiseIcon,
+  CaretDownIcon,
+  CaretRightIcon,
+  CircleNotchIcon,
+  PlayIcon,
+  PulseIcon,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -54,12 +62,23 @@ function jobLabel(jobClass: string): string {
 }
 
 export function JobsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [runs, setRuns] = useState<JobRun[] | null>(null)
-  const [tab, setTab] = useState<(typeof TABS)[number]>('all')
+  const tabParam = searchParams.get('tab')
+  const tab = TABS.includes(tabParam as (typeof TABS)[number])
+    ? (tabParam as (typeof TABS)[number])
+    : 'all'
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [expanded, setExpanded] = useState<number | null>(null)
   const [logLines, setLogLines] = useState<string[] | null>(null)
   const [detecting, setDetecting] = useState(false)
+
+  function setTab(next: (typeof TABS)[number]) {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'all') params.delete('tab')
+    else params.set('tab', next)
+    setSearchParams(params, { replace: true })
+  }
 
   const load = useCallback(() => {
     api<{ data: JobRun[] }>('/jobs')
@@ -108,7 +127,7 @@ export function JobsPage() {
   const filtered = runs?.filter((run) => (tab === 'all' ? true : run.status === tab)) ?? []
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-6">
+    <div className="mx-auto max-w-[1200px] space-y-8 px-4 py-8 sm:px-6">
       <PageHeader
         title="Automation"
         description="Every background run — fetching, finding trends, scoring and generating — with durations, failures and logs."
@@ -119,7 +138,7 @@ export function JobsPage() {
               <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} className="scale-75" />
             </label>
             <Button variant="outline" size="sm" onClick={load}>
-              <RefreshCw className="size-3.5" />
+              <ArrowsClockwiseIcon className="size-3.5" />
               Refresh
             </Button>
             <Button
@@ -129,9 +148,9 @@ export function JobsPage() {
               title="Groups new mentions into trends and scores them"
             >
               {detecting ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <CircleNotchIcon className="size-3.5 animate-spin" />
               ) : (
-                <Play className="size-3.5" />
+                <PlayIcon className="size-3.5" />
               )}
               Find new trends
             </Button>
@@ -155,7 +174,7 @@ export function JobsPage() {
         <Skeleton className="h-64 rounded-lg" />
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={Activity}
+          icon={PulseIcon}
           title={`No ${tab === 'all' ? '' : `${tab} `}runs`}
           description="Runs appear here as fetching, trend finding, scoring and generation execute."
         />
@@ -164,7 +183,7 @@ export function JobsPage() {
           <CardContent className="p-0">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
+                <tr className="border-b border-border text-left font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
                   <th className="px-4 py-2.5 font-medium">Run</th>
                   <th className="px-4 py-2.5 font-medium">Status</th>
                   <th className="px-4 py-2.5 font-medium">Duration</th>
@@ -212,14 +231,22 @@ function JobRow({ run, status, expanded, logLines, onToggle }: JobRowProps) {
     <>
       <tr
         onClick={onToggle}
-        className="cursor-pointer border-b align-top transition-colors hover:bg-surface-muted/60"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onToggle()
+          }
+        }}
+        tabIndex={0}
+        aria-expanded={expanded}
+        className="cursor-pointer border-b border-border align-top transition-colors duration-150 hover:bg-surface-muted/60 focus-visible:bg-surface-muted/60 focus-visible:outline-none"
       >
         <td className="px-4 py-2.5">
           <span className="mr-1.5 inline-flex w-3 align-middle text-muted-foreground">
             {expanded ? (
-              <ChevronDown className="size-3.5" />
+              <CaretDownIcon className="size-3.5" />
             ) : (
-              <ChevronRight className="size-3.5" />
+              <CaretRightIcon className="size-3.5" />
             )}
           </span>
           <span className="text-xs font-medium">{jobLabel(run.job_class)}</span>
@@ -232,15 +259,15 @@ function JobRow({ run, status, expanded, logLines, onToggle }: JobRowProps) {
         <td className="px-4 py-2.5">
           <span
             className={cn(
-              'whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium',
+              'whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase',
               status.className,
             )}
           >
             {status.label}
           </span>
         </td>
-        <td className="px-4 py-2.5 text-xs tabular-nums">{formatDuration(run.duration_ms)}</td>
-        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+        <td className="px-4 py-2.5 font-mono text-xs tabular-nums">{formatDuration(run.duration_ms)}</td>
+        <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
           {run.started_at ? new Date(run.started_at).toLocaleTimeString() : '—'}
         </td>
         <td className="max-w-md px-4 py-2.5 text-xs">
@@ -256,9 +283,9 @@ function JobRow({ run, status, expanded, logLines, onToggle }: JobRowProps) {
         </td>
       </tr>
       {expanded ? (
-        <tr className="border-b bg-surface-muted/40 last:border-0">
+        <tr className="border-b border-border bg-surface-muted/40 last:border-0">
           <td colSpan={5} className="px-6 py-3">
-            <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+            <p className="mb-1.5 font-mono text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
               Run log — #{run.id}
             </p>
             {logLines === null ? (
@@ -301,5 +328,5 @@ function MetaSummary({ meta }: { meta: Record<string, unknown> }) {
     meta.routed_to ?? null,
   ].filter(Boolean)
 
-  return <span className="text-muted-foreground">{interesting.join(' · ') || '—'}</span>
+  return <span className="font-mono text-muted-foreground">{interesting.join(', ') || '—'}</span>
 }
