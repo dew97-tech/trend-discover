@@ -1,0 +1,22 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local environment overrides
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Local AI tooling configs — existing tracked files are unaffected,
+# new files inside these folders are ignored.
+.agents/
+.claude/
+.qwen/
+.opencode/
+skills-lock.json
+AGENTS.md
+CLAUDE.md
