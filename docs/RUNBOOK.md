@@ -53,12 +53,11 @@ pipeline; `posts:nightly` never picks trends marked **Posted**.
 ## 3. Database access
 
 ```bash
-"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" \
-  -u trend_app -p trend_discover
+"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u trend_app -p trend_discover
 ```
 
-Root password is in your password manager / `.env` history; app credentials live ONLY in
-`backend/.env`. Key tables: `source_items` → `trend_source_item` → `trends` → `trend_signals`.
+MySQL prompts for the password. The app credentials live ONLY in `backend/.env`
+(`DB_USERNAME`, `DB_PASSWORD`). Key tables: `source_items` → `trend_source_item` → `trends` → `trend_signals`.
 
 ## 4. Resetting the derived data (items are kept)
 
@@ -85,6 +84,8 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 |---|---|---|
 | cURL error 60 SSL | Windows PHP has no CA bundle | `curl.cainfo`/`openssl.cafile` = `C:/tools/cacert.pem` in `C:\php\php.ini` (already set) |
 | Job silently never runs after `queue:clear` | ShouldBeUnique lock persists | `DELETE FROM cache_locks;` |
+| `Generate post` says queued but nothing in the worker | Identical style/voice/angle already queued, or a stale unique lock from a cleared queue | The API now answers **409** with the reason — wait or change the angle. Stale lock: `DELETE FROM cache_locks;` |
+| Very long custom angle did nothing (fixed) | Unique lock key embedded the raw angle → overflowed `cache_locks.key` varchar(255); Laravel swallowed the insert error and dropped the dispatch silently | Fixed — `GeneratePostJob::uniqueId()` hashes the spec (key ~110 chars). Keep new unique IDs short/hashed |
 | `Unknown prompt template […]` / stale model config in jobs | long-running `queue:work` keeps the config it booted with | **After editing `config/*.php` or prompts: `php artisan queue:restart`** (workers respawn with fresh config). `config:clear` alone is not enough for a running worker. |
 | 401 from GitHub in worker but OK in tinker | stale long-running processes hold old config | kill stray `php.exe artisan serve`/workers (`tasklist`, `taskkill //PID x //F`) |
 | Eloquent says table `source_item_trend` missing | default pivot naming vs our migration | pivot names are explicit in all `belongsToMany` calls |
@@ -241,6 +242,13 @@ php artisan posts:nightly --force      # another post even if today's exists
   chips in the editor, and appended to the clipboard text when "Copy for LinkedIn" runs
   (toggle in the Preview tab). Old posts can be backfilled with
   `posts:generate-hashtags --missing` + a worker, or per-post via the editor button.
+- **Mark as posted**: Studio rows, the Library menu, the editor action bar and the
+  dashboard Today's-post tile all call `POST /api/posts/{id}/status` with `published`;
+  the Copy-for-LinkedIn toast also offers a one-click action. This stamps
+  `published_at` + `published_channel=linkedin`, marks the source trend **Posted**
+  (the nightly picker stops suggesting it) and moves the post to the Posted tabs.
+  **Unmark as posted** clears the stamp and restores the trend to Ready when no other
+  published post remains. Soft-deleted trends never block the transition.
 - **Snippet cards**: the Visuals tab derives a code card via AI; the card is designed at
   1x and exported at 2x (**1200×1200** / **1200×628**) with Shiki highlighting and
   JetBrains Mono, so code stays readable in the LinkedIn feed. **Copy image** puts the
