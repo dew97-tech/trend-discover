@@ -1,80 +1,78 @@
 /**
- * ray.so-style snippet-card design tokens.
+ * Snippet-card design tokens — "Signal Desk" export artifact.
  *
  * The card is designed at a fixed "1x" size and exported at 2x (pixelRatio 2)
  * so LinkedIn receives a 1200px-wide raster with ~28-30px code text — roughly
  * body-copy size once the feed scales it down.
+ *
+ * Deliberately flat: a single canvas color (never a gradient), the shared dark
+ * code window, neutral window controls and a hairline ring instead of a drop
+ * shadow. Code token colors are fixed so exports look identical regardless of
+ * the app's light/dark theme.
  */
 
 export interface SnippetTheme {
   label: string
-  /** Canvas gradient behind the window. */
-  background: string
+  /** Flat canvas behind the window. */
+  canvas: string
   /** Window body. */
   window: string
-  /** Window ring + shadow. */
+  /** Base code foreground — used by plain-text snippets and uncolored tokens. */
+  code: string
+  /** Window hairline ring. */
   ring: string
-  shadow: string
   /** Title bar text. */
   chrome: string
-  /** Traffic lights: [close, minimize, maximize]. */
+  /** Title-bar divider + badge fill. */
+  chromeSoft: string
+  /** Window controls — neutral to keep one accent per card. */
   dots: [string, string, string]
 }
 
+const NEUTRAL_DOTS: [string, string, string] = ['#c9d0d9', '#98a2b3', '#667085']
+const WINDOW = '#0d1117'
+const CODE_FG = '#e6edf3'
+
 export const SNIPPET_THEMES = {
-  purple: {
-    label: 'Purple',
-    background: 'linear-gradient(135deg, #c9b8fd 0%, #9b7cf6 45%, #6d28d9 100%)',
-    window: '#0a0a0a',
-    ring: 'rgba(255, 255, 255, 0.10)',
-    shadow: '0 32px 64px rgba(24, 10, 64, 0.45)',
+  paper: {
+    label: 'Paper',
+    canvas: '#eef1f5',
+    window: WINDOW,
+    code: CODE_FG,
+    ring: 'rgba(21, 24, 29, 0.10)',
     chrome: 'rgba(255, 255, 255, 0.45)',
-    dots: ['#ff5f57', '#febc2e', '#28c840'],
+    chromeSoft: 'rgba(255, 255, 255, 0.08)',
+    dots: NEUTRAL_DOTS,
   },
-  candy: {
-    label: 'Candy',
-    background: 'linear-gradient(135deg, #ffd6e0 0%, #ff8fab 48%, #fb6f92 100%)',
-    window: '#0a0a0a',
-    ring: 'rgba(255, 255, 255, 0.12)',
-    shadow: '0 32px 64px rgba(96, 16, 44, 0.40)',
+  signal: {
+    label: 'Signal',
+    canvas: '#e4effa',
+    window: WINDOW,
+    code: CODE_FG,
+    ring: 'rgba(21, 24, 29, 0.10)',
     chrome: 'rgba(255, 255, 255, 0.45)',
-    dots: ['#ff5f57', '#febc2e', '#28c840'],
+    chromeSoft: 'rgba(255, 255, 255, 0.08)',
+    dots: NEUTRAL_DOTS,
   },
-  sunset: {
-    label: 'Sunset',
-    background: 'linear-gradient(135deg, #ffe1b0 0%, #ffa279 48%, #ef5560 100%)',
-    window: '#0a0a0a',
-    ring: 'rgba(255, 255, 255, 0.12)',
-    shadow: '0 32px 64px rgba(110, 34, 12, 0.42)',
+  white: {
+    label: 'White',
+    canvas: '#ffffff',
+    window: WINDOW,
+    code: CODE_FG,
+    ring: 'rgba(21, 24, 29, 0.10)',
     chrome: 'rgba(255, 255, 255, 0.45)',
-    dots: ['#ff5f57', '#febc2e', '#28c840'],
+    chromeSoft: 'rgba(255, 255, 255, 0.08)',
+    dots: NEUTRAL_DOTS,
   },
-  ocean: {
-    label: 'Ocean',
-    background: 'linear-gradient(135deg, #a5f3fc 0%, #38bdf8 50%, #2563eb 100%)',
-    window: '#0a0a0a',
-    ring: 'rgba(255, 255, 255, 0.12)',
-    shadow: '0 32px 64px rgba(6, 46, 92, 0.45)',
+  ink: {
+    label: 'Ink',
+    canvas: '#15181d',
+    window: WINDOW,
+    code: CODE_FG,
+    ring: 'rgba(255, 255, 255, 0.14)',
     chrome: 'rgba(255, 255, 255, 0.45)',
-    dots: ['#ff5f57', '#febc2e', '#28c840'],
-  },
-  forest: {
-    label: 'Forest',
-    background: 'linear-gradient(135deg, #bbf7d0 0%, #4ade80 50%, #15803d 100%)',
-    window: '#0a0a0a',
-    ring: 'rgba(255, 255, 255, 0.12)',
-    shadow: '0 32px 64px rgba(8, 58, 26, 0.45)',
-    chrome: 'rgba(255, 255, 255, 0.45)',
-    dots: ['#ff5f57', '#febc2e', '#28c840'],
-  },
-  mono: {
-    label: 'Mono',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 55%, #8fa3b8 100%)',
-    window: '#0a0a0a',
-    ring: 'rgba(255, 255, 255, 0.12)',
-    shadow: '0 32px 64px rgba(15, 23, 42, 0.35)',
-    chrome: 'rgba(255, 255, 255, 0.45)',
-    dots: ['#ff5f57', '#febc2e', '#28c840'],
+    chromeSoft: 'rgba(255, 255, 255, 0.08)',
+    dots: NEUTRAL_DOTS,
   },
 } as const satisfies Record<string, SnippetTheme>
 
@@ -120,7 +118,7 @@ export const CANVAS_PADDING = {
   default: 40,
 } as const
 
-/** Shiki theme used inside the window (ray.so's editor look). */
+/** Shiki theme used inside the window (dark, matching `--code`). */
 export const CODE_THEME = 'github-dark-default'
 
 export interface FitResult {

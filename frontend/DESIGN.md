@@ -151,6 +151,16 @@ not DOM order. New overlay primitives must pick their layer from this table.
 - Dates and numbers use `Intl` via `toLocaleDateString`/`toLocaleString`.
 - No zoom blocking, no paste blocking, no autoplaying motion.
 
+## Export cards (Visuals tab)
+
+Snippet cards are standalone LinkedIn artifacts, not app surfaces: a flat
+canvas color (never a gradient), a `#0d1117` code window matching `--code`,
+neutral window controls, and a hairline ring instead of an overlay shadow.
+Token colors are fixed (`github-dark-default`, code foreground `#e6edf3`) so an
+export is byte-identical in light and dark themes; `paper` is the default
+canvas. Never give the canvas a gradient or a drop shadow — the card must live
+in the same visual world as the app.
+
 ## Provenance
 
 Built after a full UI audit against these open-source guidance sets, applied

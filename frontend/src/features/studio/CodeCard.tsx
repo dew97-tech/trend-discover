@@ -13,8 +13,10 @@ import {
 
 /**
  * Shareable snippet card rendered as pure DOM so html-to-image can export it
- * to PNG locally (offline, free). Designed at a fixed 1x size, ray.so style:
- * gradient canvas → dark window with traffic lights → highlighted code.
+ * to PNG locally (offline, free). Designed at a fixed 1x size: flat canvas →
+ * dark code window with neutral controls → highlighted code. The base code
+ * color is set on the pre so plain-text snippets and tokens without their own
+ * color stay readable on the dark window — in the preview and the export.
  */
 
 export interface CodeCardSpec {
@@ -100,21 +102,21 @@ export const CodeCard = forwardRef<HTMLDivElement, Props>(function CodeCard(
   return (
     <div
       ref={ref}
-      style={{ background: t.background, padding }}
+      style={{ background: t.canvas, padding }}
       className={cn('flex items-center justify-center overflow-hidden', className)}
     >
       <div
         style={{
           backgroundColor: t.window,
-          boxShadow: `0 0 0 1px ${t.ring}, ${t.shadow}`,
-          borderRadius: 16,
+          boxShadow: `0 0 0 1px ${t.ring}`,
+          borderRadius: 12,
         }}
         className="flex w-full flex-col overflow-hidden"
       >
         {/* Title bar */}
         <div
           className="flex shrink-0 items-center gap-3 px-4 py-3"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ borderBottom: `1px solid ${t.chromeSoft}` }}
         >
           <span className="flex shrink-0 items-center gap-1.5" aria-hidden>
             {t.dots.map((color) => (
@@ -135,7 +137,7 @@ export const CodeCard = forwardRef<HTMLDivElement, Props>(function CodeCard(
 
           <span
             className="shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
-            style={{ color: t.chrome, backgroundColor: 'rgba(255,255,255,0.06)' }}
+            style={{ color: t.chrome, backgroundColor: t.chromeSoft }}
           >
             {languageLabel}
           </span>
@@ -144,7 +146,7 @@ export const CodeCard = forwardRef<HTMLDivElement, Props>(function CodeCard(
         {/* Code */}
         <pre
           className="overflow-hidden px-5 py-5 font-mono"
-          style={{ fontSize, lineHeight: CODE.lineHeight, tabSize: 2 }}
+          style={{ fontSize, lineHeight: CODE.lineHeight, tabSize: 2, color: t.code }}
         >
           <code>
             {visibleLines.map((lineTokens, index) => (

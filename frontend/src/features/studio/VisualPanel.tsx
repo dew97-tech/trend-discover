@@ -64,7 +64,7 @@ function fontEmbedCss(node: HTMLElement): Promise<string | undefined> {
 export function VisualPanel({ post }: Props) {
   const [images, setImages] = useState<ImagesState | null>(null)
   const [busy, setBusy] = useState<'snippet' | 'prompt' | null>(null)
-  const [theme, setTheme] = useState<SnippetThemeKey>('purple')
+  const [theme, setTheme] = useState<SnippetThemeKey>('paper')
   const [exportSize, setExportSize] = useState<CardSizeKey>('square')
   const [padding, setPadding] = useState<number>(CANVAS_PADDING.default)
   const [lineNumbers, setLineNumbers] = useState(false)
