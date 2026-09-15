@@ -84,7 +84,8 @@
   --z-sticky: 30;
   --z-overlay: 40;
   --z-modal: 50;
-  --z-toast: 60;
+  --z-popover: 60;
+  --z-toast: 70;
 
   --radius: 0.5rem;
 }

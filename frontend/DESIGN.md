@@ -78,6 +78,22 @@ Rules:
 - Interactive rows/cards get `hover:bg-surface-muted` or
   `hover:border-signal/50`, plus `focus-visible:ring-2 ring-ring/40`.
 
+## Layering
+
+Stacking is explicit and single-source in `index.css`:
+
+| Token | Value | Layer |
+|---|---|---|
+| `--z-sticky` | 30 | Sticky header, editor action bar |
+| `--z-overlay` | 40 | Dialog backdrops |
+| `--z-modal` | 50 | Dialog content |
+| `--z-popover` | 60 | Select, dropdown, tooltip — must sit **above** dialogs |
+| `--z-toast` | 70 | Skip link (Sonner manages its own, higher) |
+
+Never give a portaled popper the overlay or modal layer: a Select opened inside a
+dialog is portaled to `body`, so z-index (`--z-popover`) is what keeps it on top,
+not DOM order. New overlay primitives must pick their layer from this table.
+
 ## Layout
 
 - Page container: `mx-auto max-w-[1200px] px-4 py-8 sm:px-6`.
