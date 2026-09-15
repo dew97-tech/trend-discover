@@ -4,7 +4,8 @@
 > Local-first · Laravel 13 API + React 19 SPA · MySQL 8
 > **Last updated: Phase 12 (model auto-discovery + source expansion)** — see
 > `ARCHITECTURE.md` for logic details, `API.md` for endpoint reference,
-> `RUNBOOK.md` for daily operation.
+> `RUNBOOK.md` for daily operation, `COOKBOOK.md` for the nightly
+> post-generation workflow.
 
 ---
 
@@ -57,6 +58,11 @@ combined with high saturation must rank BELOW moderate popularity with high nove
 | D18 | Hashtags generated with the post + AI backfill | 3–5 grounded PascalCase tags stored on the post, editable chips, included in Copy by default; `posts:generate-hashtags` backfills older posts |
 | D19 | Auto-discovered model fallbacks (Settings → Model resilience) | Gateway roster churns; daily scan ranks models cheap/fast-first, probes the top 10, stores the 3 fastest working (daily 03:20 + on total chain failure). OpenCode's general free tier is API-blocked — discovery uses the Go roster (cost 0); verify with `scripts/verify-ai-fallback.php` |
 | D20 | YouTube channels expanded to 6 | Sumit Saha (Learn with Sumit), Web Dev Cody, ByteByteGo, CodeWithHarry join KodeKloud + Laravel Daily; views captured from `media:statistics` and counted ÷200 |
+| D21 | ray.so-style snippet cards + 2x clipboard export | First live LinkedIn run showed 11px code in a 1080² frame → unreadable after LinkedIn's downscale. Cards are now designed at 600px/1x and exported at 2x (1200×1200 / 1200×628), Shiki-highlighted, JetBrains Mono embedded; "Copy image" pastes straight into LinkedIn |
+| D22 | Collapsible sidebar icon rail | Sidebar toggles w-60 ↔ w-16 with tooltip icons, persisted in `localStorage`; navigation stays visible without eating content width |
+| D23 | AI revision suggestions (hook/body) + polished preview | Wrong-answer posts are fixed by describing the correction (optional reference paste) → `RevisePostJob` proposes in `post_revisions`; Apply writes the targeted field + version + queues quality re-check. Grounded in trend research, length-capped ±15%, markdown stripped for LinkedIn; Preview gains block rendering + Raw toggle |
+| D24 | Hook and body separated + fixed app shell | Body no longer stores the hook; Copy/Preview/exports compose `hook + body` exactly once; revisions are target-scoped; `posts:split-hooks` repaired the corpus. Shell is `h-svh` with `main` as the only scroll container, so the collapsible sidebar stays put while content scrolls |
+| D25 | One daily workflow + auto-cleanup + manual trend status + plain-language UI | `pipeline:run` (01:00) batches every source, then chains detection → scoring → cleanup, so only `schedule:work` + `queue:work` run; `CleanupOldTrendsJob` soft-deletes trends idle 2+ days (posts survive); `workflow_status` (draft/ready/posted) is manually set and excluded from the nightly picker; all technical labels renamed (Automation, Post Studio, Originality, Overexposure, Style/Voice, "… Tip" formats, etc.) via shared label modules |
 
 ## 4. Progress Status
 
@@ -95,7 +101,7 @@ combined with high saturation must rank BELOW moderate popularity with high nove
 
 ```
 trend-discover-project/
-├── docs/                    PLAN.md · ARCHITECTURE.md · API.md · RUNBOOK.md
+├── docs/                    PLAN.md · ARCHITECTURE.md · API.md · RUNBOOK.md · COOKBOOK.md
 ├── backend/                 Laravel 13 API
 │   ├── app/Domain/Trending/
 │   │   ├── Collectors/      CollectorInterface · RawItem · CollectorFactory

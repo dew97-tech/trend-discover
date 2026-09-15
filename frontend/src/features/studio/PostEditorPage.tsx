@@ -11,6 +11,7 @@ import {
   Save,
   Sparkles,
   Trash2,
+  Wand2,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -36,8 +37,11 @@ import {
   patchPost,
   regeneratePost,
   type ContentPost,
+  type RevisionTarget,
 } from '../trends/api'
 import { FormatPickerDialog } from '../trends/FormatPickerDialog'
+import { RevisionPanel } from './RevisionPanel'
+import { PostBodyPreview } from './PostBodyPreview'
 import { VisualPanel } from './VisualPanel'
 
 const QUALITY_DIMENSIONS: Array<[string, string, string]> = [
@@ -72,6 +76,7 @@ export function PostEditorPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [revisionTarget, setRevisionTarget] = useState<RevisionTarget | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -100,10 +105,12 @@ export function PostEditorPage() {
   }, [post?.trend_id])
 
   const copyText = useMemo(() => {
-    if (!includeHashtags || hashtags.length === 0) return body
+    const full = [hook.trim(), body.trim()].filter(Boolean).join('\n\n')
 
-    return `${body.trimEnd()}\n\n${hashtags.map((tag) => `#${tag}`).join(' ')}`
-  }, [body, hashtags, includeHashtags])
+    if (!includeHashtags || hashtags.length === 0) return full
+
+    return `${full}\n\n${hashtags.map((tag) => `#${tag}`).join(' ')}`
+  }, [hook, body, hashtags, includeHashtags])
 
   function handleSave() {
     if (!post) return
@@ -120,14 +127,49 @@ export function PostEditorPage() {
       .finally(() => setSaving(false))
   }
 
+  /**
+   * Revisions run against the saved post — flush pending edits first so the
+   * AI revises exactly what the author sees.
+   */
+  async function saveBeforeRevision(): Promise<boolean> {
+    if (!post || !dirty) return true
+
+    try {
+      const { data }: { data: ContentPost } = await patchPost(post.id, {
+        title,
+        hook,
+        body,
+        hashtags,
+      })
+      setPost({ ...data, trend: post.trend })
+      setHashtags(data.hashtags ?? hashtags)
+      setDirty(false)
+
+      return true
+    } catch {
+      toast.error('Could not save your edits before suggesting — try again.')
+
+      return false
+    }
+  }
+
+  function handleRevisionApplied(updated: ContentPost) {
+    setPost({ ...updated, trend: post?.trend })
+    setTitle(updated.title ?? '')
+    setHook(updated.hook ?? '')
+    setBody(updated.body)
+    setHashtags(updated.hashtags ?? [])
+    setDirty(false)
+  }
+
   function handleRegenerate() {
     if (!post) return
     setRegenerating(true)
 
     regeneratePost(post.id)
       .then(() => {
-        toast.info('Regeneration queued — it will appear as a new variant in Studio.', {
-          action: { label: 'Open Studio', onClick: () => navigate('/studio') },
+        toast.info('New generation queued — it will appear as another post in Post Studio.', {
+          action: { label: 'Open Post Studio', onClick: () => navigate('/studio') },
         })
       })
       .catch(() => toast.error('Regeneration failed.'))
@@ -233,7 +275,7 @@ export function PostEditorPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/studio')}>
           <ArrowLeft className="size-4" />
-          Studio
+          Post Studio
         </Button>
         <div className="flex items-center gap-2">
           <StatusBadge status={post.status} />
@@ -245,7 +287,7 @@ export function PostEditorPage() {
 
       <div className="space-y-2">
         <h1 className="text-xl font-semibold tracking-tight">
-          {title || hook || 'Untitled variant'}
+          {title || hook || 'Untitled post'}
         </h1>
         {post.trend ? (
           <p className="text-sm text-muted-foreground">
@@ -259,7 +301,7 @@ export function PostEditorPage() {
         ) : null}
       </div>
 
-      {/* Variant switcher — all posts generated from this trend */}
+      {/* Post switcher — all posts generated from this trend */}
       <div className="flex flex-wrap items-center gap-1.5">
         {siblings.map((sibling) => {
           const active = sibling.id === post.id
@@ -284,7 +326,7 @@ export function PostEditorPage() {
         })}
         <Button variant="ghost" size="xs" onClick={() => setPickerOpen(true)}>
           <Plus className="size-3" />
-          New variant
+          Generate another post
         </Button>
       </div>
 
@@ -301,7 +343,7 @@ export function PostEditorPage() {
           <Field
             label="Internal title"
             htmlFor="post-title"
-            help="Never published — it only labels this variant inside Trend Discover."
+            help="Never published — it only labels this post inside the app."
           >
             <Textarea
               id="post-title"
@@ -319,6 +361,16 @@ export function PostEditorPage() {
             htmlFor="post-hook"
             help="First line of the post. LinkedIn truncates around 210 characters with “see more”."
             hint={`${hook.length} characters`}
+            action={
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setRevisionTarget(revisionTarget === 'hook' ? null : 'hook')}
+              >
+                <Wand2 className="size-3" />
+                Suggest improvement
+              </Button>
+            }
           >
             <Textarea
               id="post-hook"
@@ -329,12 +381,21 @@ export function PostEditorPage() {
               }}
               rows={2}
             />
+            {revisionTarget === 'hook' ? (
+              <RevisionPanel
+                postId={post.id}
+                target="hook"
+                onApplied={handleRevisionApplied}
+                onDismiss={() => setRevisionTarget(null)}
+                beforeSubmit={saveBeforeRevision}
+              />
+            ) : null}
           </Field>
 
           <Field
             label="Body"
             htmlFor="post-body"
-            help="LinkedIn allows up to 3000 characters; 900–1600 performs best."
+            help="The post content. The hook above is published as its first line — don't repeat it here. LinkedIn allows up to 3000 characters; 900–1600 performs best."
             hint={
               <span
                 className={cn(
@@ -343,6 +404,16 @@ export function PostEditorPage() {
               >
                 {body.length} / 3000 characters
               </span>
+            }
+            action={
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setRevisionTarget(revisionTarget === 'body' ? null : 'body')}
+              >
+                <Wand2 className="size-3" />
+                Suggest improvement
+              </Button>
             }
           >
             <Textarea
@@ -354,6 +425,15 @@ export function PostEditorPage() {
               }}
               rows={14}
             />
+            {revisionTarget === 'body' ? (
+              <RevisionPanel
+                postId={post.id}
+                target="body"
+                onApplied={handleRevisionApplied}
+                onDismiss={() => setRevisionTarget(null)}
+                beforeSubmit={saveBeforeRevision}
+              />
+            ) : null}
           </Field>
 
           <Field
@@ -442,28 +522,12 @@ export function PostEditorPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="mx-auto max-w-2xl rounded-lg border bg-surface p-5">
-                <div className="flex items-center gap-2 border-b pb-3">
-                  <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    You
-                  </span>
-                  <div className="text-xs">
-                    <p className="font-medium">Your name</p>
-                    <p className="text-muted-foreground">Software Engineer</p>
-                  </div>
-                </div>
-                <div className="whitespace-pre-wrap pt-3 text-[15px] leading-relaxed">
-                  {body.trimStart()}
-                </div>
-                {includeHashtags && hashtags.length > 0 ? (
-                  <p className="pt-3 text-[15px] text-primary">
-                    {hashtags.map((tag) => `#${tag}`).join(' ')}
-                  </p>
-                ) : null}
-                <p className="pt-4 text-right text-[11px] text-muted-foreground">
-                  {copyText.length} characters
-                </p>
-              </div>
+              <PostBodyPreview
+                hook={hook}
+                body={body}
+                hashtags={hashtags}
+                includeHashtags={includeHashtags}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -474,10 +538,10 @@ export function PostEditorPage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-muted-foreground">
-                  Quality gate
+                  Quality check
                   <HelpTip
                     className="ml-1.5"
-                    text="Composite of six rubric dimensions plus deterministic rule checks. 80+ routes to Ready, 60–79 to Review."
+                    text="Overall quality from six dimensions plus automatic checks. 80+ is ready to post, 60–79 needs a quick review."
                   />
                 </p>
                 <span className="text-lg font-semibold tabular-nums">
@@ -541,10 +605,10 @@ export function PostEditorPage() {
           variant="outline"
           onClick={handleRegenerate}
           disabled={regenerating}
-          title="Queues a fresh AI draft with the same format, tone and angle — appears as a new variant"
+          title="Queues a fresh AI draft with the same style, voice and angle — appears as another post"
         >
           <RefreshCw className={cn('size-4', regenerating && 'animate-spin')} />
-          Regenerate
+          Generate again
         </Button>
         <Button
           variant="ghost"
@@ -569,7 +633,7 @@ export function PostEditorPage() {
         title="Delete this post?"
         description={
           <>
-            This variant will be permanently removed, including its version history and attached
+            This post will be permanently removed, including its version history and attached
             images. This cannot be undone.
           </>
         }

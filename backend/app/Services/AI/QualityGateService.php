@@ -34,7 +34,6 @@ class QualityGateService
     {
         $ruleIssues = $this->ruleIssues($post);
         $rubric = $this->llmRubric($post, $research);
-
         $weights = [
             'technical_accuracy' => 0.25,
             'novelty' => 0.15,
@@ -76,11 +75,22 @@ class QualityGateService
     }
 
     /**
+     * The complete post as published: hook + body (they are stored separately).
+     */
+    private function fullText(ContentPost $post): string
+    {
+        $hook = trim((string) $post->hook);
+        $body = trim((string) $post->body);
+
+        return $hook === '' ? $body : $hook."\n\n".$body;
+    }
+
+    /**
      * @return list<string>
      */
     private function ruleIssues(ContentPost $post): array
     {
-        $body = trim($post->body);
+        $body = $this->fullText($post);
         $issues = [];
 
         $length = mb_strlen($body);
@@ -130,7 +140,7 @@ class QualityGateService
         ])->filter()->implode("\n");
 
         $prompt = $this->prompts->render('quality.user', [
-            'post_body' => $post->hook !== null ? $post->hook."\n\n".$post->body : $post->body,
+            'post_body' => $this->fullText($post),
             'research_summary' => $researchSummary,
         ]);
 

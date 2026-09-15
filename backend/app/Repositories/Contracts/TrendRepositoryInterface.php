@@ -18,5 +18,10 @@ interface TrendRepositoryInterface
 
     public function recommended(int $limit = 4): Collection;
 
+    /**
+     * @param  list<int>  $excludeTrendIds
+     */
+    public function dailyCandidates(int $limit = 10, array $excludeTrendIds = []): Collection;
+
     public function findWithRelations(int $id): ?Trend;
 }

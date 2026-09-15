@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\JobRun;
+use App\Repositories\Contracts\JobRunRepositoryInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 
 class ReconcileStaleJobRunsCommand extends Command
 {
@@ -12,7 +12,7 @@ class ReconcileStaleJobRunsCommand extends Command
 
     protected $description = 'Mark stuck running job rows as failed (worker died before completing)';
 
-    public function handle(): int
+    public function handle(JobRunRepositoryInterface $runs): int
     {
         $hours = (int) $this->option('hours');
 
@@ -31,8 +31,8 @@ class ReconcileStaleJobRunsCommand extends Command
                 'error' => "Worker terminated before completion — reconciled after {$hours}h in running state.",
             ])->save();
 
-            Log::channel('pipeline')->warning(
-                "[Reconcile run={$run->id}] marked failed — was stale since {$run->started_at}",
+            $runs->logger($run)->warning(
+                "marked failed — was stale since {$run->started_at} (threshold {$hours}h)",
                 ['job_class' => $run->job_class],
             );
 

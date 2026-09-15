@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTheme } from 'next-themes'
 import {
   Activity,
@@ -9,6 +9,8 @@ import {
   Menu,
   Monitor,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenSquare,
   Radar,
   Settings,
@@ -31,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from './ThemeToggle'
 
 interface NavItem {
   to: string
@@ -41,27 +44,29 @@ interface NavItem {
 
 const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
-    label: 'Intelligence',
+    label: 'Discover',
     items: [
-      { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/trends', label: 'Trends', icon: Radar },
     ],
   },
   {
-    label: 'Content',
+    label: 'Create',
     items: [
-      { to: '/studio', label: 'Studio', icon: PenSquare },
-      { to: '/library', label: 'Library', icon: Library },
+      { to: '/studio', label: 'Post Studio', icon: PenSquare },
+      { to: '/library', label: 'Post Library', icon: Library },
     ],
   },
   {
-    label: 'System',
+    label: 'Manage',
     items: [
-      { to: '/jobs', label: 'Jobs', icon: Activity },
+      { to: '/jobs', label: 'Automation', icon: Activity },
       { to: '/settings', label: 'Settings', icon: Settings },
     ],
   },
 ]
+
+const SIDEBAR_COLLAPSED_KEY = 'td_shell_sidebar_collapsed'
 
 function ProductMark() {
   return (
@@ -74,31 +79,42 @@ function ProductMark() {
   )
 }
 
-function NavEntries({ onNavigate }: { onNavigate?: () => void }) {
+function NavEntries({
+  onNavigate,
+  collapsed = false,
+}: {
+  onNavigate?: () => void
+  collapsed?: boolean
+}) {
   return (
-    <nav className="flex-1 space-y-5 p-3">
+    <nav className={cn('flex-1 space-y-5 p-3', collapsed && 'px-2')}>
       {NAV_GROUPS.map((group) => (
         <div key={group.label} className="space-y-1">
-          <p className="px-3 text-[11px] font-medium tracking-wide text-muted-foreground/70">
-            {group.label}
-          </p>
+          {!collapsed ? (
+            <p className="px-3 text-[11px] font-medium tracking-wide text-muted-foreground/70">
+              {group.label}
+            </p>
+          ) : null}
           {group.items.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
               onClick={onNavigate}
+              title={collapsed ? label : undefined}
+              aria-label={collapsed ? label : undefined}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                  'flex items-center rounded-md text-sm transition-colors',
+                  collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2',
                   isActive
                     ? 'bg-accent font-medium text-accent-foreground'
                     : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground',
                 )
               }
             >
-              <Icon className="size-4" />
-              {label}
+              <Icon className="size-4 shrink-0" />
+              {!collapsed ? label : null}
             </NavLink>
           ))}
         </div>
@@ -133,7 +149,32 @@ function ThemeMenuItems() {
 export function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  function toggleSidebar() {
+    const next = !collapsed
+    setCollapsed(next)
+
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0')
+    } catch {
+      // Storage unavailable (private mode) — the toggle still works in-session.
+    }
+  }
+
+  // main is the scroll container now — reset it on navigation.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 })
+  }, [location.pathname])
 
   async function handleLogout() {
     await logout()
@@ -141,22 +182,28 @@ export function AppShell() {
     navigate('/login')
   }
 
-  const userMenu = (
+  const renderUserMenu = (compact = false) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-muted"
+          aria-label={compact ? 'Account menu' : undefined}
+          className={cn(
+            'flex w-full items-center rounded-md text-left transition-colors hover:bg-surface-muted',
+            compact ? 'justify-center p-2' : 'gap-3 px-2 py-2',
+          )}
         >
-          <Avatar className="size-8">
+          <Avatar className="size-8 shrink-0">
             <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
               {user?.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{user?.name}</span>
-            <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
-          </span>
+          {!compact ? (
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{user?.name}</span>
+              <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
+            </span>
+          ) : null}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-56">
@@ -171,15 +218,53 @@ export function AppShell() {
   )
 
   return (
-    <div className="flex min-h-svh">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r bg-surface md:flex">
-        <div className="flex h-14 items-center gap-2 border-b px-5">
-          <ProductMark />
-          <span className="font-semibold tracking-tight">Trend Discover</span>
+    <div className="flex h-svh overflow-hidden">
+      {/* Desktop sidebar — collapsible icon rail */}
+      <aside
+        className={cn(
+          'hidden min-h-0 shrink-0 flex-col overflow-y-auto border-r bg-surface transition-[width] duration-200 ease-out md:flex',
+          collapsed ? 'w-16' : 'w-60',
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-14 shrink-0 items-center border-b',
+            collapsed ? 'justify-center px-2' : 'gap-2 px-5',
+          )}
+        >
+          {collapsed ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Expand sidebar"
+              aria-expanded={false}
+              onClick={toggleSidebar}
+            >
+              <PanelLeftOpen className="size-4" />
+            </Button>
+          ) : (
+            <>
+              <ProductMark />
+              <span className="truncate font-semibold tracking-tight">Trend Discover</span>
+              <div className="ml-auto flex items-center gap-1">
+                <ThemeToggle />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Collapse sidebar"
+                  aria-expanded
+                  onClick={toggleSidebar}
+                >
+                  <PanelLeftClose className="size-4" />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
-        <NavEntries />
-        <div className="border-t p-3">{userMenu}</div>
+        <NavEntries collapsed={collapsed} />
+        <div className={cn('border-t', collapsed ? 'p-2' : 'p-3')}>
+          {renderUserMenu(collapsed)}
+        </div>
       </aside>
 
       {/* Mobile top bar */}
@@ -194,6 +279,9 @@ export function AppShell() {
         </Button>
         <ProductMark />
         <span className="font-semibold tracking-tight">Trend Discover</span>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Mobile drawer */}
@@ -219,12 +307,12 @@ export function AppShell() {
               </Button>
             </div>
             <NavEntries onNavigate={() => setMobileNavOpen(false)} />
-            <div className="border-t p-3">{userMenu}</div>
+            <div className="border-t p-3">{renderUserMenu()}</div>
           </div>
         </div>
       ) : null}
 
-      <main className="flex-1 overflow-auto pt-14 md:pt-0">
+      <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-auto pt-14 md:pt-0">
         <Outlet />
       </main>
     </div>

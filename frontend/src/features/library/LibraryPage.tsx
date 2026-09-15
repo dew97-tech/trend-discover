@@ -116,15 +116,15 @@ export function LibraryPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-6">
       <PageHeader
-        title="Library"
-        description="Every generated post across its lifecycle — search, filter and manage status."
+        title="Post Library"
+        description="Every generated post — search, filter and update its status."
       />
 
       <Toolbar className="justify-between">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="published">Published</TabsTrigger>
+            <TabsTrigger value="published">Posted</TabsTrigger>
             <TabsTrigger value="archived">Archived</TabsTrigger>
             <TabsTrigger value="all">All</TabsTrigger>
           </TabsList>
@@ -139,10 +139,10 @@ export function LibraryPage() {
           />
           <Select value={format} onValueChange={setFormat}>
             <SelectTrigger size="sm" className="w-44">
-              <SelectValue placeholder="Format" />
+              <SelectValue placeholder="Style" />
             </SelectTrigger>
             <SelectContent className="max-h-72">
-              <SelectItem value="all">All formats</SelectItem>
+              <SelectItem value="all">All styles</SelectItem>
               {CONTENT_FORMATS.map((f) => (
                 <SelectItem key={f.value} value={f.value}>
                   {f.label}

@@ -42,6 +42,11 @@ class ContentPost extends Model
         return $this->hasMany(ContentImage::class);
     }
 
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(PostRevision::class);
+    }
+
     public function scopeInLibrary(Builder $query): Builder
     {
         return $query->whereIn('status', [

@@ -38,6 +38,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Per-Job Daily Logs
+    |--------------------------------------------------------------------------
+    |
+    | Background jobs do NOT get a static channel here — RunLogger builds an
+    | on-demand daily logger from these defaults, so adding a new job needs no
+    | config change. Files land as:
+    |
+    |   storage/logs/jobs/{job-kebab}-YYYY-MM-DD.log
+    |   e.g. collect-source-items-2026-09-13.log
+    |
+    | Override scope/level/retention in .env (LOG_JOBS_DIR, LOG_JOBS_MAX_FILES).
+    */
+
+    'jobs' => [
+        'driver' => 'daily',
+        'path' => env('LOG_JOBS_DIR', 'logs/jobs'),
+        'level' => env('LOG_LEVEL', 'debug'),
+        'max_files' => (int) env('LOG_JOBS_MAX_FILES', 30),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Log Channels
     |--------------------------------------------------------------------------
     |
@@ -133,17 +155,17 @@ return [
 
         /*
         |--------------------------------------------------------------------------
-        | Pipeline channel
+        | Pipeline channel (legacy fallback)
         |--------------------------------------------------------------------------
-        | Structured, human-readable events for every background job
-        | (collect / detect / score / generate). Each line carries the
-        | job_run id so GET /api/jobs/{id}/log can filter precisely.
+        | Kept for lines written outside a job context (services/commands that
+        | use Log::channel('pipeline') directly) and for reading historical
+        | files. Job runs now write to per-job daily files — see 'jobs' above.
         */
         'pipeline' => [
             'driver' => 'daily',
             'path' => storage_path('logs/pipeline.log'),
             'level' => env('LOG_LEVEL', 'debug'),
-            'days' => 14,
+            'max_files' => 14,
             'replace_placeholders' => true,
         ],
 

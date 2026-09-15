@@ -27,6 +27,8 @@ class DashboardController extends Controller
             function () {
                 $top = $this->trends->topRanked(6);
 
+                $todayPost = $this->posts->latestForToday();
+
                 return [
                     'new_trends' => array_sum($this->trends->statusCounts()) ?: 0,
                     'high_potential' => $this->trends->highPotentialCount(),
@@ -34,6 +36,18 @@ class DashboardController extends Controller
                     'recommended' => \App\Http\Resources\TrendResource::collection(
                         $this->trends->recommended(4),
                     )->resolve(),
+                    'today_post' => $todayPost === null ? null : [
+                        'id' => $todayPost->id,
+                        'title' => $todayPost->title,
+                        'hook' => $todayPost->hook,
+                        'body' => $todayPost->body,
+                        'hashtags' => $todayPost->hashtags ?? [],
+                        'format' => $todayPost->format,
+                        'status' => $todayPost->status->value,
+                        'quality_score' => (float) $todayPost->quality_score,
+                        'trend_title' => $todayPost->trend?->title,
+                        'generated_at' => $todayPost->generated_at?->toIso8601String(),
+                    ],
                     'recent_content' => $this->posts->recent(4)->map(
                         fn ($post) => [
                             'id' => $post->id,

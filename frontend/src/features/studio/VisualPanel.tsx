@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  Check,
   Copy,
   Download,
   ImagePlus,
+  ListOrdered,
   Loader2,
   Sparkles,
   Trash2,
   Wand2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { toPng } from 'html-to-image'
+import { getFontEmbedCSS, toBlob, toPng } from 'html-to-image'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
@@ -34,32 +36,44 @@ import {
   type SnippetImage,
 } from '../trends/imagesApi'
 import type { ContentPost } from '../trends/api'
+import { CodeCard } from './CodeCard'
 import {
-  CodeCard,
+  CANVAS_PADDING,
+  CARD_1X,
+  EXPORT_SCALE,
+  EXPORT_SIZES,
   SNIPPET_THEMES,
   SNIPPET_THEME_KEYS,
+  type CardSizeKey,
   type SnippetThemeKey,
-} from './CodeCard'
-
-const EXPORT_SIZES = {
-  square: { label: 'Square · 1080×1080', width: 1080, height: 1080 },
-  landscape: { label: 'Landscape · 1200×627', width: 1200, height: 627 },
-} as const
-
-type ExportSizeKey = keyof typeof EXPORT_SIZES
+} from './snippet-themes'
 
 interface Props {
   post: ContentPost
 }
 
+/** Font embedding is app-wide and stable — parse the stylesheets once. */
+let fontEmbedCssPromise: Promise<string | undefined> | null = null
+
+function fontEmbedCss(node: HTMLElement): Promise<string | undefined> {
+  fontEmbedCssPromise ??= getFontEmbedCSS(node).catch(() => undefined)
+
+  return fontEmbedCssPromise
+}
+
 export function VisualPanel({ post }: Props) {
   const [images, setImages] = useState<ImagesState | null>(null)
   const [busy, setBusy] = useState<'snippet' | 'prompt' | null>(null)
-  const [theme, setTheme] = useState<SnippetThemeKey>('graphite')
-  const [exportSize, setExportSize] = useState<ExportSizeKey>('square')
-  const [exporting, setExporting] = useState(false)
+  const [theme, setTheme] = useState<SnippetThemeKey>('purple')
+  const [exportSize, setExportSize] = useState<CardSizeKey>('square')
+  const [padding, setPadding] = useState<number>(CANVAS_PADDING.default)
+  const [lineNumbers, setLineNumbers] = useState(false)
+  const [exporting, setExporting] = useState<'png' | 'copy' | null>(null)
+  const [readyKey, setReadyKey] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [previewWidth, setPreviewWidth] = useState(0)
   const exportRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
 
   const readySnippet = images?.snippet ?? null
   const pendingSnippet = images?.pendingSnippet ?? null
@@ -67,6 +81,15 @@ export function VisualPanel({ post }: Props) {
   const prompts = images?.prompts ?? []
   const uploads = images?.uploads ?? []
   const hasPending = pendingSnippet !== null || prompts.some((p) => p.status === 'pending')
+
+  const card = CARD_1X[exportSize]
+  const specKey = readySnippet?.spec
+    ? `${readySnippet.spec.language}|${readySnippet.spec.code}`
+    : null
+  const highlighted = specKey !== null && readyKey === specKey
+  const previewScale = previewWidth > 0 ? Math.min(1, previewWidth / card.width) : 1
+
+  const markHighlightReady = useCallback(() => setReadyKey(specKey), [specKey])
 
   useEffect(() => {
     void refresh()
@@ -83,6 +106,19 @@ export function VisualPanel({ post }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPending])
 
+  // Live preview is a scaled copy of the export node — measure its column.
+  useEffect(() => {
+    const el = previewRef.current
+    if (!el) return
+
+    const observer = new ResizeObserver((entries) => {
+      setPreviewWidth(entries[0]?.contentRect.width ?? 0)
+    })
+    observer.observe(el)
+
+    return () => observer.disconnect()
+  }, [readySnippet?.id])
+
   function refresh() {
     return fetchPostImages(post.id)
       .then(setImages)
@@ -94,7 +130,7 @@ export function VisualPanel({ post }: Props) {
 
     suggestSnippet(post.id, force)
       .then(() => refresh())
-      .catch((err: Error) => toast.error(err.message || 'Snippet suggestion failed.'))
+      .catch((err: Error) => toast.error(err.message || 'Code card suggestion failed.'))
       .finally(() => setBusy(null))
   }
 
@@ -107,29 +143,63 @@ export function VisualPanel({ post }: Props) {
       .finally(() => setBusy(null))
   }
 
-  async function handleDownload() {
-    if (!exportRef.current) return
+  async function settledExportNode() {
+    const node = exportRef.current
+    if (!node) return null
 
-    setExporting(true)
+    await document.fonts.ready
+
+    return {
+      node,
+      options: {
+        pixelRatio: EXPORT_SCALE,
+        fontEmbedCSS: await fontEmbedCss(node),
+        cacheBust: false,
+      },
+    }
+  }
+
+  async function handleDownload() {
+    const target = await settledExportNode()
+    if (!target) return
+
+    setExporting('png')
 
     try {
-      const { width, height } = EXPORT_SIZES[exportSize]
-      const dataUrl = await toPng(exportRef.current, {
-        pixelRatio: 1,
-        width,
-        height,
-        cacheBust: true,
-      })
-
+      const dataUrl = await toPng(target.node, target.options)
       const link = document.createElement('a')
       link.download = `trend-snippet-${post.id}-${exportSize}.png`
       link.href = dataUrl
       link.click()
-      toast.success('PNG downloaded.')
+      toast.success(`PNG downloaded (${card.width * EXPORT_SCALE}×${card.height * EXPORT_SCALE}).`)
     } catch {
       toast.error('Export failed.')
     } finally {
-      setExporting(false)
+      setExporting(null)
+    }
+  }
+
+  async function handleCopyImage() {
+    if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+      toast.error('Clipboard images are not supported here — use PNG download instead.')
+      return
+    }
+
+    const target = await settledExportNode()
+    if (!target) return
+
+    setExporting('copy')
+
+    try {
+      const blob = await toBlob(target.node, target.options)
+      if (!blob) throw new Error('empty export')
+
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      toast.success('Image copied — paste it straight into LinkedIn.')
+    } catch {
+      toast.error('Copy failed — use PNG download instead.')
+    } finally {
+      setExporting(null)
     }
   }
 
@@ -144,13 +214,13 @@ export function VisualPanel({ post }: Props) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      {/* ── Snippet card ─────────────────────────────────── */}
+      {/* ── Code card ────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-sm font-medium">
-              Snippet card
-              <HelpTip text="A shareable code card rendered from this post. Download it as an image for LinkedIn and keep the code visually consistent." />
+              Code card
+              <HelpTip text="ray.so-style shareable code card. Copy it as an image for LinkedIn — the export is 2x and sized so the code stays readable in the feed." />
             </p>
             <div className="flex flex-wrap items-center gap-1.5">
               <Button
@@ -164,13 +234,13 @@ export function VisualPanel({ post }: Props) {
                 ) : (
                   <Wand2 className="size-3.5" />
                 )}
-                {readySnippet ? 'Re-suggest' : 'Suggest snippet'}
+                {readySnippet ? 'Suggest again' : 'Suggest code card'}
               </Button>
 
               {readySnippet ? (
                 <>
                   <Select value={theme} onValueChange={(v) => setTheme(v as SnippetThemeKey)}>
-                    <SelectTrigger size="sm" className="w-32">
+                    <SelectTrigger size="sm" className="w-28">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -184,13 +254,13 @@ export function VisualPanel({ post }: Props) {
 
                   <Select
                     value={exportSize}
-                    onValueChange={(v) => setExportSize(v as ExportSizeKey)}
+                    onValueChange={(v) => setExportSize(v as CardSizeKey)}
                   >
                     <SelectTrigger size="sm" className="w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(Object.keys(EXPORT_SIZES) as ExportSizeKey[]).map((key) => (
+                      {(Object.keys(EXPORT_SIZES) as CardSizeKey[]).map((key) => (
                         <SelectItem key={key} value={key}>
                           {EXPORT_SIZES[key].label}
                         </SelectItem>
@@ -198,13 +268,51 @@ export function VisualPanel({ post }: Props) {
                     </SelectContent>
                   </Select>
 
+                  <label className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
+                    <span className="text-xs text-muted-foreground">Pad</span>
+                    <input
+                      type="range"
+                      min={CANVAS_PADDING.min}
+                      max={CANVAS_PADDING.max}
+                      step={8}
+                      value={padding}
+                      onChange={(e) => setPadding(Number(e.target.value))}
+                      className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-border accent-primary"
+                      aria-label="Canvas padding"
+                    />
+                  </label>
+
+                  <Button
+                    variant={lineNumbers ? 'default' : 'outline'}
+                    size="icon-sm"
+                    aria-label="Toggle line numbers"
+                    aria-pressed={lineNumbers}
+                    onClick={() => setLineNumbers((v) => !v)}
+                  >
+                    <ListOrdered className="size-3.5" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleCopyImage()}
+                    disabled={exporting !== null || !highlighted}
+                  >
+                    {exporting === 'copy' ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                    Copy image
+                  </Button>
+
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => void handleDownload()}
-                    disabled={exporting}
+                    disabled={exporting !== null || !highlighted}
                   >
-                    {exporting ? (
+                    {exporting === 'png' ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : (
                       <Download className="size-3.5" />
@@ -215,7 +323,7 @@ export function VisualPanel({ post }: Props) {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Remove snippet"
+                    aria-label="Remove code card"
                     className="text-muted-foreground hover:text-danger"
                     onClick={() => setConfirmRemove(true)}
                   >
@@ -233,7 +341,7 @@ export function VisualPanel({ post }: Props) {
           ) : failedSnippet !== null && readySnippet === null ? (
             <EmptyState
               icon={AlertTriangle}
-              title="Snippet generation failed"
+              title="Code card generation failed"
               description="The AI could not derive a code card from this post. Try again."
               action={
                 <Button size="sm" variant="outline" onClick={() => handleSuggest(true)}>
@@ -242,38 +350,76 @@ export function VisualPanel({ post }: Props) {
               }
             />
           ) : readySnippet !== null && readySnippet.spec ? (
-            <div className="mx-auto w-full max-w-xl">
-              <div className="aspect-square w-full">
-                <CodeCard spec={readySnippet.spec} theme={theme} className="h-full" />
+            <div className="mx-auto w-full max-w-[640px]">
+              {/* Live scaled preview of the exact export node */}
+              <div ref={previewRef} className="w-full">
+                <div
+                  className="relative mx-auto"
+                  style={{
+                    width: card.width * previewScale,
+                    height: card.height * previewScale,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: card.width,
+                      height: card.height,
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: 'top left',
+                    }}
+                  >
+                    <CodeCard
+                      spec={readySnippet.spec}
+                      theme={theme}
+                      padding={padding}
+                      cardHeight={card.height}
+                      showLineNumbers={lineNumbers}
+                      className="h-full w-full"
+                      onHighlightReady={markHighlightReady}
+                    />
+                  </div>
+                </div>
               </div>
-              <p className="pt-2 text-center text-xs text-muted-foreground">
-                {readySnippet.spec.title} · {readySnippet.spec.language}
+              <p className="flex items-center justify-center gap-1.5 pt-2 text-center text-xs text-muted-foreground">
+                {highlighted ? (
+                  <Check className="size-3 text-success" />
+                ) : (
+                  <Loader2 className="size-3 animate-spin" />
+                )}
+                {readySnippet.spec.title} · {readySnippet.spec.language} · export{' '}
+                {card.width * EXPORT_SCALE}×{card.height * EXPORT_SCALE}
               </p>
             </div>
           ) : (
             <EmptyState
               icon={Wand2}
-              title="No snippet card yet"
+              title="No code card yet"
               description="Generate a code card from the most illustrative part of this post."
               action={
                 <Button size="sm" onClick={() => handleSuggest(true)} disabled={busy !== null}>
-                  Suggest snippet
+                  Suggest code card
                 </Button>
               }
             />
           )}
 
-          {/* Hidden fixed-size render used for crisp, shift-free PNG export */}
+          {/* Hidden exact-size render used for the 2x PNG export */}
           {readySnippet?.spec ? (
             <div
               aria-hidden
               className="pointer-events-none fixed top-0 -left-[99999px]"
-              style={{
-                width: EXPORT_SIZES[exportSize].width,
-                height: EXPORT_SIZES[exportSize].height,
-              }}
+              style={{ width: card.width, height: card.height }}
             >
-              <CodeCard ref={exportRef} spec={readySnippet.spec} theme={theme} className="h-full" />
+              <CodeCard
+                ref={exportRef}
+                spec={readySnippet.spec}
+                theme={theme}
+                padding={padding}
+                cardHeight={card.height}
+                showLineNumbers={lineNumbers}
+                className="h-full w-full"
+                onHighlightReady={markHighlightReady}
+              />
             </div>
           ) : null}
         </CardContent>
@@ -403,7 +549,7 @@ export function VisualPanel({ post }: Props) {
       <ConfirmDialog
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
-        title="Remove this snippet card?"
+        title="Remove this code card?"
         description="The generated code card for this post will be deleted. You can always generate a new one."
         confirmLabel="Remove"
         onConfirm={() => {
@@ -434,7 +580,7 @@ function SnippetSkeleton() {
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="flex items-center gap-2 rounded-md border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
           <Loader2 className="size-3.5 animate-spin" />
-          Generating snippet card…
+          Generating code card…
         </span>
       </div>
     </div>

@@ -68,7 +68,9 @@ class SnippetService
         return [
             'code' => str((string) ($data['code'] ?? '// nothing to show'))->limit(1200),
             'language' => in_array(($data['language'] ?? 'other'), [
-                'php', 'javascript', 'typescript', 'python', 'sql', 'bash', 'go', 'rust',
+                'php', 'javascript', 'typescript', 'tsx', 'jsx', 'python', 'sql',
+                'bash', 'go', 'rust', 'json', 'yaml', 'html', 'css', 'java',
+                'csharp', 'c', 'cpp', 'dockerfile',
             ], true) ? $data['language'] : 'other',
             'title' => str((string) ($data['title'] ?? 'Snippet'))->limit(60),
         ];

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ContentImageController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\JobRunController;
 use App\Http\Controllers\Api\PostController;
+use App\Http\Controllers\Api\PostRevisionController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SourceController;
 use App\Http\Controllers\Api\TrendController;
@@ -55,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/trends', [TrendController::class, 'index']);
     Route::get('/trends/{id}', [TrendController::class, 'show']);
     Route::post('/trends/{id}/rescore', [TrendController::class, 'rescore']);
+    Route::patch('/trends/{id}/workflow-status', [TrendController::class, 'updateWorkflowStatus']);
     Route::post('/trends/{id}/generate', [TrendController::class, 'generate']);
     Route::delete('/trends/{id}', [TrendController::class, 'destroy']);
     Route::post('/trends/{id}/restore', [TrendController::class, 'restore']);
@@ -75,4 +77,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/posts/{post}/images/prompt', [ContentImageController::class, 'generatePrompt']);
     Route::post('/posts/{post}/images/upload', [ContentImageController::class, 'upload']);
     Route::delete('/images/{id}', [ContentImageController::class, 'destroy']);
+
+    // AI revision suggestions (hook/body corrections)
+    Route::get('/posts/{post}/revisions', [PostRevisionController::class, 'index']);
+    Route::post('/posts/{post}/revisions', [PostRevisionController::class, 'store']);
+    Route::post('/posts/{post}/revisions/{revision}/apply', [PostRevisionController::class, 'apply']);
+    Route::post('/posts/{post}/revisions/{revision}/discard', [PostRevisionController::class, 'discard']);
 });

@@ -7,15 +7,22 @@ use App\Models\JobRun;
 use App\Models\Source;
 use App\Repositories\Contracts\JobRunRepositoryInterface;
 use App\Repositories\Contracts\SourceItemRepositoryInterface;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class CollectSourceItemsJob implements ShouldBeUnique, ShouldQueue
+/**
+ * Fetches one source.
+ *
+ * Not unique on purpose: the daily pipeline batches one job per source, and a
+ * ShouldBeUnique job that is locked is silently dropped — which would leave
+ * the batch pending forever. Duplicate runs are harmless (insertOrIgnore).
+ */
+class CollectSourceItemsJob implements ShouldQueue
 {
-    use Queueable;
+    use Batchable, Queueable;
 
     public int $tries = 3;
 
@@ -23,12 +30,11 @@ class CollectSourceItemsJob implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 180;
 
-    public function uniqueId(): string
-    {
-        return (string) $this->source->id;
-    }
-
-    public function __construct(public readonly Source $source) {}
+    public function __construct(
+        public readonly Source $source,
+        /** Pipeline batches dispatch detection themselves after ALL sources finish. */
+        public readonly bool $chainDetection = true,
+    ) {}
 
     public function handle(
         CollectorFactory $factory,
@@ -36,6 +42,7 @@ class CollectSourceItemsJob implements ShouldBeUnique, ShouldQueue
         JobRunRepositoryInterface $runs,
     ): void {
         $run = $runs->start(static::class);
+        $log = $runs->logger($run);
 
         try {
             $rawItems = $factory->make($this->source)->collect($this->source);
@@ -58,13 +65,13 @@ class CollectSourceItemsJob implements ShouldBeUnique, ShouldQueue
             ]);
 
             // Auto-chain: newly inserted items flow straight into
-            // clustering + scoring. ShouldBeUnique collapses concurrent
-            // chains into a single detection run.
-            if ($inserted > 0) {
+            // clustering + scoring. Pipeline batches disable this and trigger
+            // detection once, after every source finished.
+            if ($inserted > 0 && $this->chainDetection) {
                 DetectTrendsJob::dispatch();
             }
 
-            Log::info('Collection finished', [
+            $log->info('collection finished', [
                 'source' => $this->source->name,
                 'fetched' => count($rows),
                 'inserted' => $inserted,
@@ -83,7 +90,7 @@ class CollectSourceItemsJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        Log::error('CollectSourceItemsJob permanently failed', [
+        Log::channel('pipeline')->error('CollectSourceItemsJob permanently failed', [
             'source_id' => $this->source->id,
             'error' => $exception->getMessage(),
         ]);

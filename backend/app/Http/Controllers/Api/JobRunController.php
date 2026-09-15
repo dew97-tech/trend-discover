@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\JobRunResource;
 use App\Models\JobRun;
 use App\Repositories\Contracts\JobRunRepositoryInterface;
+use App\Support\RunLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Storage;
 
 class JobRunController extends Controller
 {
@@ -22,8 +22,9 @@ class JobRunController extends Controller
     }
 
     /**
-     * Returns the pipeline-log lines belonging to ONE run.
-     * Scans today's + yesterday's daily pipeline files, newest last.
+     * Returns the log lines belonging to ONE run.
+     * Scans that job's per-job daily files (today + yesterday included by
+     * the glob) plus legacy pipeline files for pre-migration runs.
      */
     public function log(int $id): JsonResponse
     {
@@ -33,7 +34,7 @@ class JobRunController extends Controller
         $marker = "run={$id}]";
         $lines = [];
 
-        foreach ($this->pipelineFiles() as $file) {
+        foreach ($this->logFiles($run) as $file) {
             $handle = fopen($file, 'r');
 
             if ($handle === false) {
@@ -62,18 +63,38 @@ class JobRunController extends Controller
     /**
      * @return list<string> absolute paths, oldest first
      */
-    private function pipelineFiles(): array
+    private function logFiles(JobRun $run): array
     {
         $dir = storage_path('logs');
 
-        $files = glob($dir.'/pipeline-*.log') ?: [];
-        sort($files);
+        $files = [];
+
+        // Per-job daily files, e.g. collect-source-items-2026-09-13.log
+        foreach (glob($this->jobDirectory().'/'.RunLogger::fileStem($run->job_class).'-*.log') ?: [] as $file) {
+            $files[] = $file;
+        }
+
+        // Legacy single pipeline channel keeps old runs readable.
+        foreach (glob($dir.'/pipeline-*.log') ?: [] as $file) {
+            $files[] = $file;
+        }
 
         // Include the plain name for non-daily fallback configurations.
         if (is_file($dir.'/pipeline.log')) {
             $files[] = $dir.'/pipeline.log';
         }
 
+        $files = array_values(array_unique($files));
+        sort($files);
+
         return $files;
+    }
+
+    private function jobDirectory(): string
+    {
+        $config = (array) config('logging.jobs', []);
+        $relative = trim((string) ($config['path'] ?? 'logs/jobs'), '/');
+
+        return storage_path($relative);
     }
 }

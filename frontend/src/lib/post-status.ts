@@ -16,43 +16,43 @@ export const POST_STATUS_META: Record<string, PostStatusMeta> = {
     value: 'draft',
     label: 'Draft',
     className: 'bg-surface-muted text-muted-foreground',
-    description: 'Quality gate scored it below 60 — needs edits before publishing.',
+    description: 'Quality score below 60 — needs edits before posting.',
   },
   review: {
     value: 'review',
-    label: 'Review',
+    label: 'Needs review',
     className: 'bg-warning-soft text-warning',
-    description: 'Quality gate scored 60–79 — read it once before publishing.',
+    description: 'Quality score 60–79 — read it once before posting.',
   },
   ready: {
     value: 'ready',
-    label: 'Ready',
+    label: 'Ready to post',
     className: 'bg-success-soft text-success',
-    description: 'Quality gate scored 80+ — ready to copy into LinkedIn.',
+    description: 'Quality score 80+ — ready to copy into LinkedIn.',
   },
   published: {
     value: 'published',
-    label: 'Published',
+    label: 'Posted',
     className: 'bg-info-soft text-info',
-    description: 'Marked as published on LinkedIn.',
+    description: 'Marked as posted on LinkedIn.',
   },
   archived: {
     value: 'archived',
     label: 'Archived',
     className: 'bg-secondary text-muted-foreground',
-    description: 'Kept for reference but out of the active queue.',
+    description: 'Kept for reference but out of the active list.',
   },
   failed_generation: {
     value: 'failed_generation',
     label: 'Generation failed',
     className: 'bg-danger-soft text-danger',
-    description: 'The AI call failed — regenerate the post.',
+    description: 'The AI call failed — generate the post again.',
   },
   failed_validation: {
     value: 'failed_validation',
-    label: 'Validation failed',
+    label: 'Auto-check failed',
     className: 'bg-danger-soft text-danger',
-    description: 'The draft failed deterministic checks.',
+    description: 'The draft failed the automatic checks.',
   },
 }
 
@@ -69,7 +69,7 @@ export function postStatusMeta(status: string): PostStatusMeta {
 
 /** Lifecycle actions available from the Library/Studio menus. */
 export const POST_STATUS_ACTIONS: Array<{ status: string; label: string }> = [
-  { status: 'review', label: 'Move to Review' },
-  { status: 'ready', label: 'Mark Ready' },
+  { status: 'review', label: 'Mark for review' },
+  { status: 'ready', label: 'Mark ready' },
   { status: 'archived', label: 'Archive' },
 ]

@@ -4,42 +4,51 @@
 
 ---
 
-## 1. Starting the stack (3 terminals)
+## 1. Starting the stack
 
-```bash
-# Terminal 1 — API + scheduler
+```powershell
+# one command: opens scheduler + worker (+ frontend) in separate terminals
+powershell -ExecutionPolicy Bypass -File scripts/start-stack.ps1
+
+# ...or manually (2 terminals):
 cd "G:\Office Work Kandari\trend-discover-project\backend"
-php artisan serve                # :8000
-php artisan schedule:work        # cron runner for dev
-
-# Terminal 2 — queue workers (pipeline)
-php artisan queue:work --sleep=0 # add -v for verbose
-
-# Terminal 3 — frontend
-cd ../frontend
-npm run dev                      # :5173 (proxies /api → :8000)
+php artisan serve                 # :8000 (API)
+php artisan schedule:work         # triggers pipeline:run daily at 01:00
+php artisan queue:work --sleep=1  # executes every job (fetch → trends → score → cleanup)
 ```
 
-Login at `http://localhost:5173` — sessions last 60 minutes.
+That is the whole daily workflow — `pipeline:run` fetches every enabled source, then
+finds/groups new trends, scores them and cleans up stale trends, all automatically.
+Frontend: `cd ../frontend; npm run dev` → http://localhost:5173 (proxies `/api` → :8000).
+Login sessions last 60 minutes.
 
 ## 2. Manual pipeline commands
 
 ```bash
+php artisan pipeline:run            # full daily workflow (fetch → trends → score → cleanup)
+php artisan pipeline:run --dry-run  # list the sources that would be fetched
 php artisan trends:collect          # collect from ALL enabled sources
 php artisan trends:collect hn       # by type: hn|github|rss|devto|lobsters
 php artisan trends:collect youtube  # by source name when a type has >1 source
 php artisan trends:detect           # cluster ungrouped items + queue scoring
 php artisan trends:score            # re-score all active trends
 php artisan trends:score --trend=95 # score a single trend
+php artisan trends:cleanup --dry-run  # trends with no activity for 2+ days
+php artisan trends:cleanup            # soft-delete them (posts stay, restorable)
 php artisan trends:reclassify --dry-run  # what the word-boundary matcher would change
 php artisan trends:reclassify       # re-sync techs/category on existing trends + re-score
 php artisan ai:check-models         # live-probe allowlisted + auto-discovered AI models
 php artisan ai:refresh-models       # re-discover the 3 fastest working fallbacks
 php artisan posts:generate-hashtags --missing  # backfill AI hashtags for posts without them
+php artisan posts:split-hooks --apply   # strip duplicated hook lines from pre-separation bodies
+php artisan posts:nightly --dry-run # today's LinkedIn post candidates (no AI call)
+php artisan posts:nightly           # generate + export today's LinkedIn post
 ```
 
-Normal flow needs none of these — collection auto-chains detection which auto-chains
-scoring. Use them for testing/tuning.
+Normal flow needs none of these — `pipeline:run` runs daily at 01:00 via `schedule:work`,
+then `trends:score` (02:00) and `posts:nightly` (02:30). Use them for testing/tuning.
+Stale trends (no activity for 2+ days) are cleaned up automatically at the end of the
+pipeline; `posts:nightly` never picks trends marked **Posted**.
 
 ## 3. Database access
 
@@ -175,15 +184,50 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
 
 ## 8c. Pipeline logging
 
-- Channel `pipeline` (daily file, 14-day retain): every job logs structured events
-  tagged `[JobName run={id}]` — start/finish/verdicts/failures included.
-- `GET /api/jobs/{id}/log` returns that run's lines; the Pipeline Jobs screen
-  expands rows to show them inline. Re-score toasts link straight to the screen.
+- **Per-job daily files**: every job run writes to
+  `storage/logs/jobs/{job-kebab}-YYYY-MM-DD.log` — e.g.
+  `collect-source-items-2026-09-13.log`, `detect-trends-2026-09-13.log`,
+  `generate-post-2026-09-13.log`. Retention 30 days
+  (`LOG_JOBS_MAX_FILES`, dir override `LOG_JOBS_DIR`).
+- Every line keeps the `[JobName run={id}]` marker, so `GET /api/jobs/{id}/log`
+  filters one execution out of its job's daily file; the Pipeline Jobs screen
+  expands rows to show them inline. Legacy `pipeline-*.log` files are still
+  read so pre-migration runs remain inspectable.
+- Services/commands that log outside a job context (e.g. `ModelCatalogService`,
+  `TrendController`) still use the `pipeline` channel — a 14-day daily file.
+  `CollectSourceItemsJob` was moved onto the per-job channel; it no longer
+  leaks to `laravel.log`.
+- `RunLogger::fileStem()` maps a job class to its file stem (accepts FQCN or
+  basename); add a new job and logging works with zero config.
 - **All AI operations are queued** — snippet suggestion and image prompts too
   (`SuggestSnippetJob` / `GenerateImagePromptJob`, unique per post). Controllers
   create `pending` ContentImage rows and return 202 instantly; workers fill them
   (AI calls take 30–90s+, which would fatal inside web requests). Frontend polls
   the images endpoint; failed rows surface a retry button.
+
+## 8c.1 Nightly LinkedIn post (`posts:nightly`)
+
+```bash
+php artisan posts:nightly              # generate today's post + export
+php artisan posts:nightly --dry-run    # ranked candidates, no AI call
+php artisan posts:nightly --trend=95   # force a trend
+php artisan posts:nightly --format=architecture_insight
+php artisan posts:nightly --force      # another post even if today's exists
+```
+
+- **Selection**: `TrendRepository::dailyCandidates()` ranks by
+  `focus 0.35 + usefulness 0.45 + trend_score 0.20`, drops saturation >70 and
+  usefulness <55, excludes trends posted in the last 7 days, then prefers
+  `metrics.hack_style` / practical-phrasing candidates (tip, optimiz, cache,
+  index, architecture, …).
+- **Format**: topic-aware — SQL/MySQL/Postgres topics → SQL Hack, Laravel →
+  Laravel Hack, React/Next.js → their hack formats; otherwise a
+  day-index rotation across tips/optimization/architecture/performance.
+- Runs synchronously (no worker needed) through `PostGenerationService` +
+  `QualityGateService`; budget guard skips when <4 AI calls remain.
+- **Export**: `storage/app/private/daily-posts/{date}-{slug}.md` (context +
+  metadata) and `.txt` (body + `#hashtags`, paste-ready). Also printed to
+  stdout. Scheduled daily at 02:30 after the 02:00 re-score.
 
 ## 8d. Post lifecycle & Studio
 
@@ -197,19 +241,59 @@ Then `php artisan trends:detect` to rebuild clusters with current logic.
   chips in the editor, and appended to the clipboard text when "Copy for LinkedIn" runs
   (toggle in the Preview tab). Old posts can be backfilled with
   `posts:generate-hashtags --missing` + a worker, or per-post via the editor button.
-- **Snippet cards**: the Visuals tab derives a code card via AI; the card wraps long
-  lines, themes are selectable, and PNG export renders a hidden fixed-size node
-  (1080×1080 or 1200×627) so the download never shifts the page or clips code.
+- **Snippet cards**: the Visuals tab derives a code card via AI; the card is designed at
+  1x and exported at 2x (**1200×1200** / **1200×628**) with Shiki highlighting and
+  JetBrains Mono, so code stays readable in the LinkedIn feed. **Copy image** puts the
+  PNG straight on the clipboard.
+- **Hook & Body are separate fields** — the body never contains the hook. Copy-for-LinkedIn,
+  the dashboard Today's-post button, and `posts:nightly` compose `hook + blank line + body`
+  so the published text is complete exactly once. Pre-separation posts were repaired with
+  `php artisan posts:split-hooks` (dry-run by default; `--apply` strips the duplicated
+  hook only when the body's first line matches the Hook field; mismatches are reported).
+- **Suggest improvement (AI revisions)**: Hook and Body each have a button that opens a
+  correction box (optional "paste a reference version"). Queues `RevisePostJob` →
+  `post_revisions` proposal; **Apply** writes only the targeted field, creates a version,
+  and queues a quality re-check; **Discard** keeps the proposal as history. One pending
+  suggestion per target. Proposals use trend research as ground truth and are length-capped
+  (hook ≤210 chars, body ±15%). The Preview tab has a **Raw text** switch showing exactly
+  what gets copied.
 
 ## 8e. Trend lifecycle
 
-- `DELETE /api/trends/{id}` = **soft delete**: trend hidden from all queries,
-  source items detached (free to re-cluster), generated posts preserved in library.
+- `DELETE /api/trends/{id}` = **soft delete** (labelled "Remove trend" in the UI):
+  trend hidden from all queries, source items detached (free to re-cluster), generated
+  posts preserved in the library.
 - `POST /api/trends/{id}/restore` brings it back; both write to the pipeline log.
-- Manual detection: `POST /api/pipeline/detect` or the "Run detection" button
-  on Pipeline Jobs — same path as the auto-chain after collections.
+- **Automatic cleanup**: `CleanupOldTrendsJob` runs at the end of every daily pipeline and
+  soft-deletes trends with no activity (`last_seen_at`) for 2+ days
+  (`TREND_CLEANUP_DAYS` / `config/trending.php`). Posts survive; trends are restorable.
+  Manual: `trends:cleanup --dry-run` then `trends:cleanup`.
+- **Workflow status** (manual): `PATCH /api/trends/{id}/workflow-status` with
+  `draft|ready|posted`. Set it from the Trends page (filter + badge + detail dialog).
+  `posted` trends are excluded from the nightly post picker.
+- Manual detection: `POST /api/pipeline/detect` or the "Find new trends" button
+  on Automation — same path as the pipeline's detection step.
 
 ## 9. Git conventions
 
 - Commit per phase: `Phase N: <summary>` · main branch · no secrets ever committed
   (`.env` gitignored by Laravel default).
+
+## 10. Tests
+
+```bash
+cd backend
+php artisan test                        # full suite (PHPUnit, sqlite :memory:)
+php artisan test --filter=RunLogger     # log-driver suite
+php artisan test --filter=NightlyPost   # nightly selection suite
+```
+
+- The suite uses SQLite `:memory:` (see `phpunit.xml`), so `pdo_sqlite` and
+  `sqlite3` must be enabled in `C:\php\php.ini` (both are on this machine;
+  a backup of the pre-change ini is at `C:\php\php.ini.bak-opencode`).
+- Migrations skip MySQL-only FULLTEXT indexes on non-MySQL drivers, so a fresh
+  MySQL install keeps identical indexes while tests run anywhere.
+- Current coverage: `RunLogger::fileStem` mapping, per-job log file writing
+  (one file per job per day, no shared pipeline file), nightly candidate
+  filtering/ranking, practical-preference, recency exclusion, and format
+  matching/rotation.

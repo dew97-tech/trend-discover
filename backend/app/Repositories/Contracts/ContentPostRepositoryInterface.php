@@ -23,4 +23,9 @@ interface ContentPostRepositoryInterface
     public function countsByStatus(): array;
 
     public function recent(int $limit = 4): \Illuminate\Support\Collection;
+
+    /**
+     * Latest post generated today (nightly pick) for the dashboard card.
+     */
+    public function latestForToday(): ?ContentPost;
 }

@@ -31,10 +31,13 @@ class HashtagService
             ? $trend->technologies()->pluck('name')->implode(', ')
             : '';
 
-        $requestHash = hash('sha256', 'hashtags|'.$post->id.'|'.md5($post->body));
+        // Hook and body are stored separately — feed the whole post.
+        $fullText = trim(($post->hook !== null ? $post->hook."\n\n" : '').$post->body);
+
+        $requestHash = hash('sha256', 'hashtags|'.$post->id.'|'.md5($fullText));
 
         $prompt = $this->prompts->render('hashtags.user', [
-            'post_body' => (string) str($post->body)->limit(2500),
+            'post_body' => (string) str($fullText)->limit(2500),
             'trend_title' => $trend?->title ?? 'not provided',
             'technologies' => $technologies !== '' ? $technologies : 'not provided',
         ]);

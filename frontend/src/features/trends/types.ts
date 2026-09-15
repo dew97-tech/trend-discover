@@ -16,6 +16,8 @@ export interface Trend {
   title: string
   summary?: string | null
   status: string
+  workflow_status: 'draft' | 'ready' | 'posted'
+  workflow_status_label?: string
   category?: { id: number; name: string; slug: string } | null
   technologies?: Array<{ id: number; name: string; slug: string }>
   scores: TrendScores

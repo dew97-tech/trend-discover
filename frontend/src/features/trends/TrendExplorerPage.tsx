@@ -26,10 +26,11 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { HelpTip } from '@/components/shared/HelpTip'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ScorePill } from '@/components/shared/ScorePill'
-import { fetchTrends, fetchTaxonomy, fetchTrend, rescoreTrend, deleteTrend, type Taxonomy, type TrendDetail } from './api'
+import { fetchTrends, fetchTaxonomy, fetchTrend, rescoreTrend, deleteTrend, updateTrendWorkflowStatus, type Taxonomy, type TrendDetail } from './api'
 import { FormatPickerDialog } from './FormatPickerDialog'
 import type { Trend } from './types'
-import { SCORE_HELP as TREND_SCORE_HELP } from '@/lib/scores'
+import { SCORE_HELP as TREND_SCORE_HELP, SCORE_LABELS } from '@/lib/scores'
+import { TREND_WORKFLOW_STATUS_KEYS, trendWorkflowMeta } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
 const DATE_RANGES = [
@@ -65,9 +66,11 @@ export function TrendExplorerPage() {
   const [focusOnly, setFocusOnly] = useState(false)
   const [minScore, setMinScore] = useState('0')
   const [dateRange, setDateRange] = useState('14')
+  const [workflowStatus, setWorkflowStatus] = useState('all')
 
   const [selected, setSelected] = useState<TrendDetail | null>(null)
   const [rescoring, setRescoring] = useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -87,13 +90,14 @@ export function TrendExplorerPage() {
       category_id: categoryId !== 'all' ? categoryId : undefined,
       technology_id: technologyId ?? undefined,
       focus: focusOnly ? '1' : undefined,
+      workflow_status: workflowStatus !== 'all' ? workflowStatus : undefined,
       min_trend_score: minScore !== '0' ? minScore : undefined,
       from:
         dateRange !== 'all'
           ? new Date(Date.now() - Number(dateRange) * 86_400_000).toISOString()
           : undefined,
     }),
-    [debouncedSearch, categoryId, technologyId, focusOnly, minScore, dateRange],
+    [debouncedSearch, categoryId, technologyId, focusOnly, workflowStatus, minScore, dateRange],
   )
 
   const load = useCallback(() => {
@@ -139,12 +143,12 @@ export function TrendExplorerPage() {
 
     deleteTrend(selected.id)
       .then(() => {
-        toast.success('Trend deleted — its source items are free to re-cluster.')
+        toast.success('Trend removed — its mentions can group into fresh trends.')
         setConfirmDelete(false)
         setSelected(null)
         load()
       })
-      .catch((err: Error) => toast.error(err.message || 'Delete failed.'))
+      .catch((err: Error) => toast.error(err.message || 'Remove failed.'))
       .finally(() => setDeleting(false))
   }
 
@@ -154,22 +158,38 @@ export function TrendExplorerPage() {
 
     rescoreTrend(selected.id)
       .then(() =>
-        toast.success('Re-score queued — watch it run in Pipeline Jobs.', {
+        toast.success('Score refresh queued — watch it run in Automation.', {
           action: {
             label: 'View',
             onClick: () => window.open('/jobs', '_self'),
           },
         }),
       )
-      .catch(() => toast.error('Re-score failed.'))
+      .catch(() => toast.error('Score refresh failed.'))
       .finally(() => setRescoring(false))
+  }
+
+  function handleWorkflowStatus(status: 'draft' | 'ready' | 'posted') {
+    if (!selected) return
+    setSavingStatus(true)
+
+    updateTrendWorkflowStatus(selected.id, status)
+      .then((res) => {
+        setSelected((prev) => (prev ? { ...prev, workflow_status: res.data.workflow_status } : prev))
+        setTrends((prev) =>
+          prev.map((t) => (t.id === selected.id ? { ...t, workflow_status: res.data.workflow_status } : t)),
+        )
+        toast.success(`Trend marked as ${trendWorkflowMeta(status).label}.`)
+      })
+      .catch(() => toast.error('Could not update the trend status.'))
+      .finally(() => setSavingStatus(false))
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <PageHeader
         title="Trends"
-        description="Clustered stories across every source, ranked by configurable scoring."
+        description="Stories grouped across all sources, ranked by your scoring setup."
         actions={
           <Button variant="outline" size="sm" onClick={load}>
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
@@ -223,6 +243,20 @@ export function TrendExplorerPage() {
             {DATE_RANGES.map((r) => (
               <SelectItem key={r.value} value={r.value}>
                 {r.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={workflowStatus} onValueChange={setWorkflowStatus}>
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Any status</SelectItem>
+            {TREND_WORKFLOW_STATUS_KEYS.map((key) => (
+              <SelectItem key={key} value={key}>
+                {trendWorkflowMeta(key).label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -289,14 +323,22 @@ export function TrendExplorerPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <span className="text-xs text-muted-foreground">
-                        {trend.category?.name ?? 'Uncategorized'}
+                        {trend.category?.name ?? 'General'}
                       </span>
                       {trend.hack_style ? (
                         <Badge variant="outline" className="gap-1 text-[10px] text-primary">
                           <Wrench className="size-3" />
-                          hack
+                          practical tip
                         </Badge>
                       ) : null}
+                      <span
+                        className={cn(
+                          'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                          trendWorkflowMeta(trend.workflow_status).className,
+                        )}
+                      >
+                        {trendWorkflowMeta(trend.workflow_status).label}
+                      </span>
                     </div>
                     <ScorePill score={trend.scores.trend} />
                   </div>
@@ -316,10 +358,10 @@ export function TrendExplorerPage() {
                   ) : null}
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>
-                      {trend.item_count} signal{trend.item_count === 1 ? '' : 's'}
+                      {trend.item_count} mention{trend.item_count === 1 ? '' : 's'}
                     </span>
-                    <span>novelty {Math.round(trend.scores.novelty)}</span>
-                    <span>sat {Math.round(trend.scores.saturation)}</span>
+                    <span>originality {Math.round(trend.scores.novelty)}</span>
+                    <span>overexposure {Math.round(trend.scores.saturation)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -349,14 +391,36 @@ export function TrendExplorerPage() {
                   <ScorePill score={selected.scores.trend} className="px-2.5 py-1 text-sm" />
                 </div>
                 <DialogDescription className="text-left">
-                  {selected.category?.name ?? 'Uncategorized'} · {selected.item_count} signal
+                  {selected.category?.name ?? 'General'} · {selected.item_count} mention
                   {selected.item_count === 1 ? '' : 's'}
-                  {selected.hack_style ? ' · hack-style' : ''} · first seen{' '}
+                  {selected.hack_style ? ' · practical tip' : ''} · first seen{' '}
                   {selected.first_seen_at
                     ? new Date(selected.first_seen_at).toLocaleDateString()
                     : '—'}
                 </DialogDescription>
               </DialogHeader>
+
+              {/* Manual workflow state — never touched by automation */}
+              <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b pb-3">
+                <span className="mr-1 text-xs text-muted-foreground">Status</span>
+                {TREND_WORKFLOW_STATUS_KEYS.map((key) => {
+                  const meta = trendWorkflowMeta(key)
+                  const active = selected.workflow_status === key
+
+                  return (
+                    <Button
+                      key={key}
+                      variant={active ? 'default' : 'outline'}
+                      size="xs"
+                      disabled={savingStatus}
+                      title={meta.description}
+                      onClick={() => !active && handleWorkflowStatus(key)}
+                    >
+                      {meta.label}
+                    </Button>
+                  )
+                })}
+              </div>
 
               {/* Scrollable body — header + actions stay pinned */}
               <div className="-mx-1 flex-1 space-y-5 overflow-y-auto px-1">
@@ -367,21 +431,21 @@ export function TrendExplorerPage() {
                 ) : null}
 
                 <section className="space-y-2">
-                  <h3 className="text-sm font-semibold">Score breakdown</h3>
+                  <h3 className="text-sm font-semibold">Score details</h3>
                   {(
                     [
-                      ['Freshness', selected.scores.freshness, 'freshness'],
-                      ['Momentum', selected.scores.momentum, 'momentum'],
-                      ['Relevance', selected.scores.relevance, 'relevance'],
-                      ['Usefulness', selected.scores.usefulness, 'usefulness'],
-                      ['Focus', selected.scores.focus ?? 0, 'focus'],
-                      ['Novelty', selected.scores.novelty, 'novelty'],
-                      ['Saturation', selected.scores.saturation, 'saturation'],
+                      ['freshness', selected.scores.freshness],
+                      ['momentum', selected.scores.momentum],
+                      ['relevance', selected.scores.relevance],
+                      ['usefulness', selected.scores.usefulness],
+                      ['focus', selected.scores.focus ?? 0],
+                      ['novelty', selected.scores.novelty],
+                      ['saturation', selected.scores.saturation],
                     ] as const
-                  ).map(([label, value, key]) => (
-                    <div key={label} className="flex min-w-0 items-center gap-3">
-                      <span className="flex w-24 shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                        {label}
+                  ).map(([key, value]) => (
+                    <div key={key} className="flex min-w-0 items-center gap-3">
+                      <span className="flex w-28 shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                        {SCORE_LABELS[key]}
                         <HelpTip text={TREND_SCORE_HELP[key]} />
                       </span>
                       <Progress value={value} className="h-2 min-w-0 flex-1" />
@@ -394,7 +458,7 @@ export function TrendExplorerPage() {
 
                 {selected.sources.length > 0 ? (
                   <section className="space-y-2">
-                    <h3 className="text-sm font-semibold">Detected signals</h3>
+                    <h3 className="text-sm font-semibold">Sources covering this</h3>
                     <ul className="space-y-1.5">
                       {selected.sources.slice(0, 8).map((source, i) => (
                         <li key={i} className="flex min-w-0 items-center justify-between gap-2 text-xs">
@@ -430,12 +494,12 @@ export function TrendExplorerPage() {
                   disabled={deleting}
                   onClick={() => setConfirmDelete(true)}
                 >
-                  Delete trend
+                  Remove trend
                 </button>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleRescore} disabled={rescoring}>
                     <RefreshCw className={cn('size-3.5', rescoring && 'animate-spin')} />
-                    Re-score
+                    Refresh score
                   </Button>
                   <Button size="sm" onClick={() => setPickerOpen(true)}>
                     <Sparkles className="size-3.5" />
@@ -455,14 +519,15 @@ export function TrendExplorerPage() {
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Delete this trend?"
+        title="Remove this trend?"
         description={
           <>
-            It disappears from all lists. Its {selected?.item_count ?? 0} source items are freed
-            for future clustering, and generated posts stay in the Studio.
+            It disappears from all lists. Its {selected?.item_count ?? 0} mentions are freed to
+            group into fresh trends, and generated posts stay in Post Studio. It can be restored
+            from the API if needed.
           </>
         }
-        confirmLabel="Delete trend"
+        confirmLabel="Remove trend"
         onConfirm={handleDelete}
         loading={deleting}
       />

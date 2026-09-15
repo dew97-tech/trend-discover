@@ -8,7 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('trends', function (Blueprint $table) {
+        // SQLite (test runs, phpunit :memory:) has no FULLTEXT support.
+        $supportsFullText = Schema::getConnection()->getDriverName() === 'mysql';
+
+        Schema::create('trends', function (Blueprint $table) use ($supportsFullText) {
             $table->id();
             $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title');
@@ -33,7 +36,10 @@ return new class extends Migration
 
             $table->index(['status', 'trend_score']);
             $table->index('first_seen_at');
-            $table->fullText(['title', 'summary']);
+
+            if ($supportsFullText) {
+                $table->fullText(['title', 'summary']);
+            }
         });
 
         Schema::create('trend_signals', function (Blueprint $table) {

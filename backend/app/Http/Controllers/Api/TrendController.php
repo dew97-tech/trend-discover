@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TrendFilterRequest;
+use App\Http\Requests\UpdateTrendWorkflowStatusRequest;
 use App\Http\Resources\TrendResource;
 use App\Jobs\CalculateTrendScoreJob;
 use App\Jobs\GeneratePostJob;
@@ -117,6 +118,30 @@ class TrendController extends Controller
         Log::channel('pipeline')->info('[TrendController] trend restored', ['trend_id' => $id]);
 
         return response()->json(['message' => 'Trend restored.']);
+    }
+
+    /**
+     * Manual workflow state (draft|ready|posted) — user-owned, never written
+     * by the automation lifecycle.
+     */
+    public function updateWorkflowStatus(UpdateTrendWorkflowStatusRequest $request, int $id): JsonResponse
+    {
+        $trend = $this->trends->findWithRelations($id);
+        abort_unless($trend !== null, 404);
+
+        $trend->forceFill(['workflow_status' => $request->validated('status')])->save();
+
+        Log::channel('pipeline')->info('[TrendController] workflow status changed', [
+            'trend_id' => $trend->id,
+            'workflow_status' => $trend->workflow_status->value,
+        ]);
+
+        return response()->json([
+            'message' => 'Trend marked as '.$trend->workflow_status->label().'.',
+            'data' => new TrendResource(
+                $trend->fresh(['category:id,name,slug', 'technologies:id,name,slug']),
+            ),
+        ]);
     }
 
     public function generate(\App\Http\Requests\GeneratePostRequest $request, int $id): JsonResponse

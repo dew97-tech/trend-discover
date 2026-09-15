@@ -6,6 +6,7 @@ export interface TrendFilters {
   category_id?: string
   technology_id?: string
   status?: string
+  workflow_status?: string
   min_trend_score?: string
   focus?: string
   from?: string
@@ -53,6 +54,14 @@ export function fetchTrend(id: number): Promise<TrendDetail> {
 
 export function rescoreTrend(id: number): Promise<{ message: string }> {
   return api(`/trends/${id}/rescore`, { method: 'POST' })
+}
+
+/** Manual workflow state: draft | ready | posted. */
+export function updateTrendWorkflowStatus(
+  id: number,
+  status: 'draft' | 'ready' | 'posted',
+): Promise<{ message: string; data: Trend }> {
+  return api(`/trends/${id}/workflow-status`, { method: 'PATCH', body: { status } })
 }
 
 export function deleteTrend(id: number): Promise<{ message: string }> {
@@ -234,4 +243,50 @@ export function regeneratePost(id: number): Promise<{ message: string }> {
 /** Queues AI hashtag selection for a post (async — poll the post afterwards). */
 export function generatePostHashtags(id: number): Promise<{ message: string }> {
   return api(`/posts/${id}/hashtags`, { method: 'POST' })
+}
+
+// ── AI revision suggestions (hook/body corrections) ───────────────
+
+export type RevisionTarget = 'hook' | 'body'
+
+export type RevisionStatus = 'pending' | 'ready' | 'failed' | 'applied' | 'discarded'
+
+export interface PostRevision {
+  id: number
+  content_post_id: number
+  target: RevisionTarget
+  instruction: string
+  reference: string | null
+  hook_before: string | null
+  body_before: string
+  hook_after: string | null
+  body_after: string | null
+  notes: string | null
+  status: RevisionStatus
+  error: string | null
+  char_delta: number | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export function fetchRevisions(postId: number): Promise<{ data: PostRevision[] }> {
+  return api(`/posts/${postId}/revisions`)
+}
+
+export function createRevision(
+  postId: number,
+  payload: { target: RevisionTarget; instruction: string; reference?: string },
+): Promise<{ message: string; data: PostRevision }> {
+  return api(`/posts/${postId}/revisions`, { method: 'POST', body: payload })
+}
+
+export function applyRevision(
+  postId: number,
+  revisionId: number,
+): Promise<{ message: string; data: ContentPost }> {
+  return api(`/posts/${postId}/revisions/${revisionId}/apply`, { method: 'POST' })
+}
+
+export function discardRevision(postId: number, revisionId: number): Promise<{ message: string }> {
+  return api(`/posts/${postId}/revisions/${revisionId}/discard`, { method: 'POST' })
 }

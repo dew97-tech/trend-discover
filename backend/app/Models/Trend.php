@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\TrendStatus;
+use App\Enums\TrendWorkflowStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,8 +14,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Trend extends Model
 {
     use SoftDeletes;
+
+    /** Mirror the DB defaults so fresh models are consistent before refresh. */
+    protected $attributes = [
+        'workflow_status' => 'draft',
+    ];
+
     protected $fillable = [
-        'category_id', 'title', 'summary', 'status',
+        'category_id', 'title', 'summary', 'status', 'workflow_status',
         'trend_score', 'novelty_score', 'freshness_score', 'momentum_score',
         'relevance_score', 'usefulness_score', 'focus_score', 'saturation_score',
         'why_matters', 'angles', 'metrics', 'research',
@@ -25,6 +32,7 @@ class Trend extends Model
     {
         return [
             'status' => TrendStatus::class,
+            'workflow_status' => TrendWorkflowStatus::class,
             'angles' => 'array',
             'metrics' => 'array',
             'research' => 'array',

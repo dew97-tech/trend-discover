@@ -4,22 +4,24 @@ use Illuminate\Support\Facades\Schedule;
 
 /*
 |--------------------------------------------------------------------------
-| Trend collection schedule
+| One workflow, two processes
 |--------------------------------------------------------------------------
-| Frequencies mirror system_settings key `collection.schedule`.
-| Each run dispatches queued CollectSourceItemsJob per enabled source;
-| ShouldBeUnique prevents overlap if a run is still in flight.
+| `pipeline:run` fetches every enabled source in parallel, then finds/groups
+| new trends, scores them, and cleans up stale trends — so `schedule:work`
+| and `queue:work` are the only processes needed. Each step keeps its own
+| per-job log; manual commands (trends:collect / trends:detect / trends:score)
+| still work for testing.
 */
 
-Schedule::command('trends:collect hn')->cron('0 */4 * * *')->withoutOverlapping();
-Schedule::command('trends:collect github')->cron('30 */6 * * *')->withoutOverlapping();
-Schedule::command('trends:collect rss')->cron('20 */3 * * *')->withoutOverlapping();
-Schedule::command('trends:collect devto')->cron('45 */8 * * *')->withoutOverlapping();
-Schedule::command('trends:collect lobsters')->cron('10 */3 * * *')->withoutOverlapping();
-Schedule::command('trends:collect youtube')->cron('35 */6 * * *')->withoutOverlapping();
+Schedule::command('pipeline:run')->dailyAt('01:00')->withoutOverlapping();
 
-// Nightly full re-score keeps decayed scores honest.
+// Nightly full re-score keeps decayed scores honest (touched trends were
+// already scored by the pipeline).
 Schedule::command('trends:score')->dailyAt('02:00');
+
+// Nightly LinkedIn post: usefulness-first trend pick, exported to
+// storage/app/private/daily-posts/{date}-*.{md,txt}.
+Schedule::command('posts:nightly')->dailyAt('02:30')->withoutOverlapping();
 
 // Gateway rotates its model roster; refresh cheap/fast fallbacks daily.
 Schedule::command('ai:refresh-models')->dailyAt('03:20');

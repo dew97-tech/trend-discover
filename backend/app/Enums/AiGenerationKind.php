@@ -6,6 +6,7 @@ enum AiGenerationKind: string
 {
     case Research = 'research';
     case Post = 'post';
+    case Revision = 'revision';
     case Quality = 'quality';
     case ImagePrompt = 'image_prompt';
     case Snippet = 'snippet';

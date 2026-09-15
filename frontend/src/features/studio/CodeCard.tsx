@@ -1,10 +1,20 @@
-import { forwardRef, type CSSProperties } from 'react'
+import { forwardRef, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
+import { highlightCode, type CodeToken } from './shiki'
+import {
+  CANVAS_PADDING,
+  CHROME_HEIGHT,
+  CODE,
+  CODE_PADDING_Y,
+  fitCode,
+  SNIPPET_THEMES,
+  type SnippetThemeKey,
+} from './snippet-themes'
 
 /**
  * Shareable snippet card rendered as pure DOM so html-to-image can export it
- * to PNG locally (offline, free). Long code wraps instead of clipping, and
- * the type scale adapts to the longest line so the card always looks composed.
+ * to PNG locally (offline, free). Designed at a fixed 1x size, ray.so style:
+ * gradient canvas → dark window with traffic lights → highlighted code.
  */
 
 export interface CodeCardSpec {
@@ -13,197 +23,164 @@ export interface CodeCardSpec {
   title: string
 }
 
-export interface SnippetTheme {
-  label: string
-  /** Card background (solid or gradient). */
-  background: string
-  /** Code panel background. */
-  panel: string
-  /** Panel ring color. */
-  ring: string
-  /** Header/footer text color. */
-  chrome: string
-  /** Keyword accent for this theme. */
-  keyword: string
-}
-
-const CODE_TEXT = '#e6edf3'
-const CODE_STRING = '#a5d6ff'
-const CODE_COMMENT = 'rgba(230, 237, 243, 0.38)'
-const CODE_NUMBER = '#f2cc60'
-
-export const SNIPPET_THEMES = {
-  graphite: {
-    label: 'Graphite',
-    background: 'linear-gradient(135deg, #23272e, #0d0f12)',
-    panel: '#0b0d10',
-    ring: 'rgba(255, 255, 255, 0.08)',
-    chrome: 'rgba(255, 255, 255, 0.55)',
-    keyword: '#7ee787',
-  },
-  ink: {
-    label: 'Ink',
-    background: 'linear-gradient(135deg, #1a1c22, #08090b)',
-    panel: '#0a0b0e',
-    ring: 'rgba(255, 255, 255, 0.07)',
-    chrome: 'rgba(255, 255, 255, 0.5)',
-    keyword: '#c3a6ff',
-  },
-  slate: {
-    label: 'Slate',
-    background: 'linear-gradient(135deg, #2b3542, #141a21)',
-    panel: '#10151b',
-    ring: 'rgba(255, 255, 255, 0.08)',
-    chrome: 'rgba(255, 255, 255, 0.55)',
-    keyword: '#8ec7ff',
-  },
-  ocean: {
-    label: 'Ocean',
-    background: 'linear-gradient(135deg, #0c3d63, #061c2d)',
-    panel: '#071a28',
-    ring: 'rgba(255, 255, 255, 0.09)',
-    chrome: 'rgba(255, 255, 255, 0.6)',
-    keyword: '#79c0ff',
-  },
-  clay: {
-    label: 'Clay',
-    background: 'linear-gradient(135deg, #5c3024, #26120d)',
-    panel: '#170b07',
-    ring: 'rgba(255, 255, 255, 0.08)',
-    chrome: 'rgba(255, 255, 255, 0.6)',
-    keyword: '#ffb59e',
-  },
-} as const satisfies Record<string, SnippetTheme>
-
-export type SnippetThemeKey = keyof typeof SNIPPET_THEMES
-
-export const SNIPPET_THEME_KEYS = Object.keys(SNIPPET_THEMES) as SnippetThemeKey[]
-
-const MAX_LINES = 16
-const KEYWORDS =
-  /\b(function|return|if|else|elseif|foreach|for|while|class|interface|trait|public|private|protected|static|const|let|var|new|import|from|export|default|async|await|try|catch|finally|throw|match|fn|use|namespace|echo|print|SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|GROUP|ORDER|BY|LIMIT|INDEX|CREATE|ALTER|DROP|TABLE|EXPLAIN|VACUUM|WITH|AS|ON|AND|OR|NOT|NULL|TRUE|FALSE|desc|asc)\b/gi
-
-type TokenType = 'kw' | 'str' | 'com' | 'num' | 'plain'
-interface Token {
-  text: string
-  type: TokenType
-}
-
-function tokenize(code: string): Token[] {
-  const tokens: Token[] = []
-  const pattern =
-    /(\/\/[^\n]*|#[^\n]*|--[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?\b)/g
-
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = pattern.exec(code)) !== null) {
-    if (match.index > lastIndex) {
-      pushPlain(code.slice(lastIndex, match.index))
-    }
-
-    if (match[1]) tokens.push({ text: match[0], type: 'com' })
-    else if (match[2]) tokens.push({ text: match[0], type: 'str' })
-    else if (match[3]) tokens.push({ text: match[0], type: 'num' })
-
-    lastIndex = pattern.lastIndex
-  }
-
-  function pushPlain(segment: string) {
-    let pos = 0
-
-    for (const m of segment.matchAll(KEYWORDS)) {
-      const index = m.index ?? 0
-      if (index > pos) tokens.push({ text: segment.slice(pos, index), type: 'plain' })
-      tokens.push({ text: m[0], type: 'kw' })
-      pos = index + m[0].length
-    }
-
-    if (pos < segment.length) tokens.push({ text: segment.slice(pos), type: 'plain' })
-  }
-
-  pushPlain(code.slice(lastIndex))
-
-  return tokens
-}
-
 interface Props {
   spec: CodeCardSpec
   theme: SnippetThemeKey
+  /** Canvas padding at 1x (default 40). */
+  padding?: number
+  /** Card height at 1x, used to fit the code to the export size. */
+  cardHeight?: number
+  showLineNumbers?: boolean
   className?: string
+  /** Fires once syntax highlighting is applied — gate exports on it. */
+  onHighlightReady?: () => void
+}
+
+function fontStyleFor(flags?: number): CSSProperties | undefined {
+  if (!flags) return undefined
+
+  const style: CSSProperties = {}
+
+  if (flags & 1) style.fontStyle = 'italic'
+  if (flags & 2) style.fontWeight = 700
+  if (flags & 4) style.textDecoration = 'underline'
+
+  return style
 }
 
 export const CodeCard = forwardRef<HTMLDivElement, Props>(function CodeCard(
-  { spec, theme, className },
+  {
+    spec,
+    theme,
+    padding = CANVAS_PADDING.default,
+    cardHeight = 600,
+    showLineNumbers = false,
+    className,
+    onHighlightReady,
+  },
   ref,
 ) {
   const t = SNIPPET_THEMES[theme]
+  const [tokens, setTokens] = useState<CodeToken[][] | null>(null)
 
-  const lines = spec.code.split('\n')
-  const maxLength = Math.max(1, ...lines.map((line) => line.length))
-  const clipped = lines.length > MAX_LINES
-  const visible = clipped
-    ? [...lines.slice(0, MAX_LINES), '…']
-    : lines
-  const code = visible.join('\n')
-  const tokens = tokenize(code)
+  const availableHeight = Math.max(
+    40,
+    cardHeight - padding * 2 - CHROME_HEIGHT - CODE_PADDING_Y,
+  )
 
-  const fontSize = maxLength > 58 || visible.length > 14 ? 11 : maxLength > 40 ? 12 : 13
+  const { fontSize, lines, hiddenLines } = useMemo(
+    () => fitCode(spec.code, availableHeight),
+    [spec.code, availableHeight],
+  )
 
-  const tokenStyle: Record<TokenType, CSSProperties> = {
-    kw: { color: t.keyword },
-    str: { color: CODE_STRING },
-    com: { color: CODE_COMMENT, fontStyle: 'italic' },
-    num: { color: CODE_NUMBER },
-    plain: { color: CODE_TEXT },
-  }
+  useEffect(() => {
+    let cancelled = false
+
+    setTokens(null)
+
+    void highlightCode(spec.code, spec.language).then((result) => {
+      if (cancelled) return
+
+      // Keep only the visible lines so the card and the export agree.
+      setTokens(result.slice(0, lines.length))
+      onHighlightReady?.()
+    })
+
+    return () => {
+      cancelled = true
+    }
+    // onHighlightReady is intentionally not a dependency — it is a stable callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spec.code, spec.language, lines.length])
+
+  const roundedLines: CodeToken[][] = tokens ?? lines.map((line) => [{ text: line }])
+  const visibleLines = roundedLines.slice(0, lines.length)
+  const languageLabel = spec.language && spec.language !== 'other' ? spec.language : 'code'
 
   return (
     <div
       ref={ref}
-      style={{ background: t.background }}
-      className={cn('flex w-full flex-col rounded-xl p-4', className)}
+      style={{ background: t.background, padding }}
+      className={cn('flex items-center justify-center overflow-hidden', className)}
     >
       <div
-        style={{ backgroundColor: t.panel, boxShadow: `inset 0 0 0 1px ${t.ring}` }}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg"
+        style={{
+          backgroundColor: t.window,
+          boxShadow: `0 0 0 1px ${t.ring}, ${t.shadow}`,
+          borderRadius: 16,
+        }}
+        className="flex w-full flex-col overflow-hidden"
       >
-        <div className="flex shrink-0 items-center gap-2 border-b border-white/5 px-4 py-2.5">
+        {/* Title bar */}
+        <div
+          className="flex shrink-0 items-center gap-3 px-4 py-3"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <span className="flex shrink-0 items-center gap-1.5" aria-hidden>
+            {t.dots.map((color) => (
+              <span
+                key={color}
+                className="inline-block rounded-full"
+                style={{ width: 11, height: 11, backgroundColor: color }}
+              />
+            ))}
+          </span>
+
           <span
+            className="min-w-0 flex-1 truncate text-center text-[13px] font-medium"
             style={{ color: t.chrome }}
-            className="min-w-0 truncate text-xs font-medium"
           >
             {spec.title}
           </span>
+
           <span
-            style={{ color: t.chrome }}
-            className="ml-auto shrink-0 rounded-sm bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+            className="shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+            style={{ color: t.chrome, backgroundColor: 'rgba(255,255,255,0.06)' }}
           >
-            {spec.language}
+            {languageLabel}
           </span>
         </div>
 
+        {/* Code */}
         <pre
-          className="min-h-0 flex-1 overflow-hidden whitespace-pre-wrap break-words p-4 font-mono leading-relaxed"
-          style={{ fontSize }}
+          className="overflow-hidden px-5 py-5 font-mono"
+          style={{ fontSize, lineHeight: CODE.lineHeight, tabSize: 2 }}
         >
           <code>
-            {tokens.map((token, i) => (
-              <span key={i} style={tokenStyle[token.type]}>
-                {token.text}
+            {visibleLines.map((lineTokens, index) => (
+              <span key={index} className="flex">
+                {showLineNumbers ? (
+                  <span
+                    className="mr-4 inline-block w-6 shrink-0 select-none text-right"
+                    style={{ color: 'rgba(255,255,255,0.25)' }}
+                  >
+                    {index + 1}
+                  </span>
+                ) : null}
+                <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+                  {lineTokens.map((token, tokenIndex) => (
+                    <span
+                      key={tokenIndex}
+                      style={{ color: token.color, ...fontStyleFor(token.fontStyle) }}
+                    >
+                      {token.text}
+                    </span>
+                  ))}
+                  {/* Keep empty lines from collapsing. */}
+                  {lineTokens.length === 0 ? '\u00A0' : null}
+                </span>
               </span>
             ))}
+            {hiddenLines > 0 ? (
+              <span className="flex">
+                {showLineNumbers ? <span className="mr-4 inline-block w-6 shrink-0" /> : null}
+                <span className="min-w-0 flex-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  … {hiddenLines} more lines
+                </span>
+              </span>
+            ) : null}
           </code>
         </pre>
-
-        <div className="flex shrink-0 items-center justify-between border-t border-white/5 px-4 py-2.5">
-          <span className="text-[10px] font-semibold tracking-wider text-white/40">
-            TREND DISCOVER
-          </span>
-          <span className="text-[10px] text-white/25">
-            {clipped ? `first ${MAX_LINES} of ${lines.length} lines` : `${visible.length} lines`}
-          </span>
-        </div>
       </div>
     </div>
   )

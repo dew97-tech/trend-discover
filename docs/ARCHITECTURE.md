@@ -1,7 +1,8 @@
 # Architecture & Underlying Logic
 
 > How Trend Discover actually works, with worked examples from the live system.
-> Companion docs: `PLAN.md` (status/decisions) · `API.md` · `RUNBOOK.md`.
+> Companion docs: `PLAN.md` (status/decisions) · `API.md` · `RUNBOOK.md` ·
+> `COOKBOOK.md` (local nightly-post workflow).
 
 ---
 
@@ -275,19 +276,68 @@ Failure handling: every job wraps `handle()` with JobRun start/finish; failures 
 error message and rethrow so `failed_jobs` also captures them. `GET /api/jobs` surfaces
 the last 50 runs with durations.
 
+### Per-job logging
+
+`JobRunRepository::logger()` returns a `RunLogger`; it builds an **on-demand daily
+logger** from `config('logging.jobs')`, so each job writes to its own file with no
+static channel registration:
+
+```
+storage/logs/jobs/{kebab-class-without-Job}-YYYY-MM-DD.log
+```
+
+Lines keep the `[JobName run={id}]` marker, which is what `GET /api/jobs/{id}/log`
+filters on (it resolves the exact file via `RunLogger::fileStem($run->job_class)`, then
+falls back to legacy `pipeline-*.log` for history). Services outside a job context
+still use the shared `pipeline` channel.
+
 > **Operational gotcha (documented):** `queue:clear` deletes pending jobs but NOT their
 > ShouldBeUnique locks — subsequent dispatches get silently dropped until lock expiry.
 > If detection seems dead after a queue clear: `DELETE FROM cache_locks;`
 
-## 6. Scheduling (Windows-native)
+## 6. Daily Workflow & Scheduling (Windows-native)
+
+One scheduled workflow does everything; `schedule:work` + `queue:work` are the only
+processes that need to run.
 
 ```
-hn        0 */4 * * *     rss   20 */3 * * *
-github    30 */6 * * *    lobsters 10 */3 * * *
-devto     45 */8 * * *    trends:score  daily 02:00
+pipeline:run  daily 01:00
+  ├─ Bus::batch(CollectSourceItemsJob × every enabled source)  — parallel, allowFailures
+  ├─ then: DetectTrendsJob                                     — after ALL sources finish
+  │     ├─ TrendClusterer: cluster + classify new items
+  │     ├─ CalculateTrendScoreJob per touched trend            — parallel
+  │     └─ CleanupOldTrendsJob                                 — final step
+  └─ done
+
+trends:score         daily 02:00   full re-score of active trends
+posts:nightly        daily 02:30   generate + export the LinkedIn post
+ai:refresh-models    daily 03:20   rediscover working AI fallbacks
+jobs:reconcile-stale */15          mark killed worker runs as failed
 ```
 
-All with `withoutOverlapping`. Dev: `php artisan schedule:work`.
+- Collections are **not** unique (a locked unique job inside a batch never completes);
+  duplicate runs are harmless (`insertOrIgnore`). `DetectTrendsJob` and score jobs keep
+  their unique locks.
+- Every step writes its own `job_runs` row and per-job daily log
+  (`storage/logs/jobs/{job}-YYYY-MM-DD.log`), including the new cleanup job.
+- `pipeline:run --dry-run` lists the sources; manual `trends:collect/detect/score` still
+  work for testing.
+
+### Trend cleanup
+`CleanupOldTrendsJob` (also `trends:cleanup [--days=2] [--dry-run]`) soft-deletes trends
+whose `last_seen_at` (or `created_at` when never re-seen) is older than
+`config('trending.cleanup.days')` (default 2). Source items are detached first so they
+can re-cluster; generated posts survive and any trend can be restored via
+`POST /api/trends/{id}/restore`. This bounds the trend list without touching content.
+
+### Trend workflow status
+`workflow_status` is a **manual** field (`draft | ready | posted`, default `draft`),
+separate from the automation-owned `status` lifecycle. `PATCH /api/trends/{id}/workflow-status`
+updates it; the Trends page shows it as a badge, filters on it, and the nightly picker
+excludes `posted` trends.
+
+Dev: `php artisan schedule:work` + `php artisan queue:work` (or
+`scripts/start-stack.ps1` which opens both terminals).
 Persistent: Windows Task Scheduler → `php artisan schedule:run` every minute.
 
 ## 7. Frontend Architecture
@@ -337,7 +387,35 @@ list with latency, a "broken active model" warning, and a one-click switch.
 `scripts/verify-ai-fallback.php` covers both outage scenarios (allowlist
 fallback and auto-model rescue).
 
-## 9. Content Studio & Post Lifecycle
+## 9. Nightly Post (`posts:nightly`)
+
+The local-first publishing loop — a scheduled command (02:30) plus an on-demand
+artisan command. Selection lives in `TrendRepository::dailyCandidates()`:
+
+```
+rank = focus_score×0.35 + usefulness_score×0.45 + trend_score×0.20
+guards: active · usefulness ≥ 55 · saturation ≤ 70 · no post in last 7 days
+preference: metrics.hack_style OR tip/trick/guide/optimiz/cache/index/architecture/debug/scale
+```
+
+Format selection is topic-aware first (SQL/MySQL/Postgres → `sql_hack`; Laravel →
+`laravel_hack`; React → `react_hack`; Next.js → `nextjs_hack`), then falls back to a
+day-of-year rotation across generic tips/optimization/architecture/performance formats
+so consecutive nights differ.
+
+Generation runs synchronously through `PostGenerationService` (research → prompt →
+provider) and `QualityGateService` (rules + LLM rubric), so no queue worker is required.
+Exports:
+
+```
+storage/app/private/daily-posts/{date}-{slug}.md    # metadata + post + trend context
+storage/app/private/daily-posts/{date}-{slug}.txt   # body + hashtags, clipboard-ready
+```
+
+The Dashboard surfaces the same post via `GET /api/dashboard` → `today_post` with a
+**Copy for LinkedIn** button (body + `#hashtags`), so the morning workflow is paste-only.
+
+## 10. Content Studio & Post Lifecycle
 
 ### Variants grouped by trend
 Every generation is a `ContentPost` identified by **trend × format × tone × angle**
@@ -361,24 +439,68 @@ before the feature (or edited down to zero tags) can call
 tags in the body + trend technologies using the `hashtags.user` prompt. Copy-for-LinkedIn
 appends the tags unless the user toggles them off in Preview.
 
+### Hook & body model
+`hook` and `body` are **independent fields** — the body never contains the hook. The
+published post is composed at the edges (`hook + "\n\n" + body`): editor Copy-for-LinkedIn,
+dashboard Today's-post copy, `posts:nightly` export/stdout, and the quality gate.
+`posts:split-hooks` repaired the pre-separation corpus (10 posts whose body duplicated
+the hook; 3 mismatches left untouched); the post prompt now returns a hook-free body and
+the generation cache carries a `v2` marker so stale bodies can't resurface.
+
+### AI revisions ("Suggest improvement")
+The editor's Hook and Body fields each carry a **Suggest improvement** button: the author
+writes the correction ("barrel files don't always break tree-shaking — add nuance"),
+optionally pastes a reference version, and the editor flushes unsaved edits first.
+
+`POST /posts/{id}/revisions` snapshots the current hook/body into `post_revisions`
+(one pending suggestion per target — a newer request supersedes the older) and queues
+`RevisePostJob`. `RevisionService` renders `revise.user` with the instruction, the
+optional reference, and the trend's **research as ground truth**; output is
+target-scoped: a hook revision returns only a hook (≤210 chars), a body revision only a
+body (≤3000 chars, ±15% prompt budget), markdown display markers stripped by
+`App\Support\LinkedInText` (code verbatim). Applying writes **only the target field**,
+creates a `ContentVersion` carrying `meta.revision_id`, then `ScorePostQualityJob`
+re-runs the quality gate. Discarding marks the row — proposals are history, never
+silent edits.
+
+### Preview
+The Preview tab renders the body through `parsePostBody()`: blank-line blocks become
+spaced paragraphs, fenced code becomes dark mono cards, `**bold**` / `` `code` `` /
+lists / links are styled, and emoji-led lines keep their emoji as bullets. A **Raw text**
+switch shows exactly what gets copied, the hook carries the LinkedIn ~210-char
+"see more" fold marker, and the footer reports characters/words/blocks. The copy path
+itself is unchanged — raw `body` + hashtags.
+
 ### Visuals
 Snippet derivation (`SnippetService`) returns a `{code, language, title}` spec rendered
-client-side by `CodeCard`: long lines wrap, type scale adapts to the longest line, and
-five themes replace the old gradient card. Pending generations render a fixed-aspect
-skeleton, so the panel never jumps. PNG export renders an off-screen fixed-size node
-(1080×1080 or 1200×627) before `toPng`, guaranteeing complete code and zero layout shift.
+client-side by `CodeCard` — a ray.so-style card designed at a fixed **1x** size (600×600
+or 600×314) and exported at **2x** (`pixelRatio: 2` → 1200×1200 / 1200×628, LinkedIn's
+recommended sizes). Layout: gradient canvas → dark window with traffic lights and a
+centered title → code highlighted by **Shiki** (lazy per-language imports, wasm-free JS
+engine, plain-text fallback). Typography is deterministic (`fitCode`): 15px base stepping
+down to a 13px floor for long lines, 16-line cap with an "N more lines" row. JetBrains
+Mono is bundled via `@fontsource` and embedded into the PNG by `html-to-image`
+(`getFontEmbedCSS`, cached), so exports are WYSIWYG and offline-safe. The preview is the
+same fixed-size node scaled by a `ResizeObserver`, not a reflow. **Copy image** writes the
+2x PNG to the clipboard (`toBlob` + `ClipboardItem`) for direct pasting into LinkedIn;
+PNG download remains. Pending generations render a fixed-aspect skeleton, so nothing jumps.
 
-## 10. UI Design System
+## 11. UI Design System
 
 Semantic tokens (`index.css`) on a cool neutral base with one brand accent; borders over
-shadows; light + dark via `next-themes`. Shared primitives live in
+shadows; light + dark via `next-themes`. The sidebar and mobile top bar carry a one-click
+sun/moon toggle (`components/layout/ThemeToggle.tsx`), and the user menu still offers
+Light / Dark / System. The desktop sidebar collapses to a 16px icon rail
+(`PanelLeftClose/Open`, persisted as `td_shell_sidebar_collapsed` in `localStorage`) —
+collapsed links keep `title` tooltips and the avatar-only account menu still exposes the
+theme switcher. Shared primitives live in
 `components/shared/` (`PageHeader`, `SectionHeader`, `EmptyState`, `StatusBadge`,
 `ScorePill`, `StatTile`, `Field`, `HelpTip`, `ConfirmDialog`, `CodeBlock`, `Toolbar`,
 `PostCard`). Formats and statuses are single-source modules (`lib/content-formats.ts`,
 `lib/post-status.ts`) instead of duplicated maps. Non-obvious controls carry a `HelpTip`;
 the app-level `TooltipProvider` supplies shared timing.
 
-## 11. What Comes Next
+## 12. What Comes Next
 
 See `PLAN.md §4`. Optional next: publishing-channel abstraction, a test suite
 (Pest/Vitest), query profiling, and eventually the LLM novelty judge replacing the

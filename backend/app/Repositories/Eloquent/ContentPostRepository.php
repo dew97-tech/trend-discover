@@ -142,4 +142,18 @@ class ContentPostRepository implements ContentPostRepositoryInterface
             ->limit($limit)
             ->get(['id', 'trend_id', 'title', 'hook', 'status', 'format', 'quality_score']);
     }
+
+    /**
+     * The nightly pick: latest post generated today (used by the dashboard's
+     * "Today's post" card with the copy-for-LinkedIn text).
+     */
+    public function latestForToday(): ?ContentPost
+    {
+        return ContentPost::query()
+            ->with(['trend' => fn ($q) => $q->withTrashed()->select(['id', 'title'])])
+            ->whereDate('generated_at', today())
+            ->orderByDesc('generated_at')
+            ->orderByDesc('id')
+            ->first();
+    }
 }

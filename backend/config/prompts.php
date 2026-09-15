@@ -71,20 +71,72 @@ Trade-offs:
 Practical angle: {{research_practical}}
 Confidence: {{research_confidence}}
 
-Rules for this format:
-{{format_rules}}
+Accuracy rules (non-negotiable):
+- Every factual claim must come from the research above. If a detail is not in
+  the research, do not state it as fact — omit it or phrase it as general practice.
+- Never invent statistics, benchmarks, version numbers or release dates.
+- Prefer a slightly smaller claim that is always defensible over a bigger one
+  that might be wrong.
 
 Produce JSON with exactly these keys:
 {
   "title": "internal working title (max 80 chars)",
-  "hook": "first line of the post — must earn the scroll, no clickbait",
-  "body": "full post text INCLUDING the hook as first line. 900-1600 characters.
-           Plain text with single newlines between paragraphs. No markdown headers.",
+  "hook": "the first line of the post (max 210 chars) — must earn the scroll, no clickbait",
+  "body": "the post content WITHOUT the hook, 900-1600 characters.
+           Plain text with blank lines between sections. No markdown headers.",
   "hashtags": ["3-5 LinkedIn hashtags, no # symbol, PascalCase, grounded in the
                 specific technologies and topic above. Prefer concrete
                 technologies (Laravel, MySQL, React, Next.js, TypeScript, SQL)
                 and the post's subject; never generic filler like Tech, Coding,
                 Programming, Innovation or Motivation."]
+}
+TXT,
+    ],
+
+    'revise' => [
+        'system' => "You revise LinkedIn posts written by a senior software engineer.\n{{persona}}\nReturn ONLY valid JSON.",
+        'user' => <<<'TXT'
+Revise the LinkedIn post below. The author reviewed a draft and flagged a
+problem — apply their instruction exactly, without inventing anything new.
+
+REVISION TARGET: {{target}}
+{{target_rule}}
+
+CURRENT HOOK: {{hook}}
+
+CURRENT BODY ({{char_count}} characters, {{word_count}} words):
+{{body}}
+
+GROUND TRUTH FROM THE TREND RESEARCH (the only facts you may use):
+{{research_context}}
+Key points:
+{{research_points}}
+Trade-offs:
+{{research_tradeoffs}}
+
+AUTHOR'S INSTRUCTION (must be followed):
+{{instruction}}
+
+REFERENCE VERSION (optional — adapt its accuracy and emphasis, never copy verbatim):
+{{reference}}
+
+Hard rules:
+- If the instruction corrects a claim, rewrite so the statement is accurate.
+  Remove or soften any claim not supported by the ground truth above.
+- Never add statistics, benchmarks, version numbers or release dates that are
+  not present in the ground truth.
+- {{length_rule}}
+- Plain text only: no markdown headers (###), no bold markers (**), no code
+  fences (```). Preserve the existing section structure and blank-line spacing.
+- Revise ONLY the target field. The other field stays exactly as it is and must
+  not be returned.
+- Keep the author's voice: concrete, specific, calm confidence — no motivational
+  filler and no AI-speak.
+
+Produce JSON with exactly these keys:
+{
+{{output_schema}}
+  "notes": "one short sentence describing what you changed and why"
 }
 TXT,
     ],
@@ -168,9 +220,14 @@ TXT,
     'snippet' => [
         'system' => 'You select illustrative code for social-media cards. Return ONLY valid JSON.',
         'user' => <<<'TXT'
-From the post below, derive ONE short code snippet (max 18 lines) that would look
+From the post below, derive ONE short code snippet (max 14 lines) that would look
 striking on a shareable code card. Prefer the before/after core, the key config,
 or the crucial function — whatever is most visually self-explanatory.
+
+Rules for readability at a glance:
+- keep every line under 60 characters
+- no long run-on expressions; break them across lines
+- the snippet must make sense without surrounding code
 
 POST
 {{post_body}}
@@ -178,7 +235,7 @@ POST
 JSON with exactly these keys:
 {
   "code": "the snippet source, plain text",
-  "language": "php|javascript|typescript|python|sql|bash|go|rust|other",
+  "language": "php|javascript|typescript|tsx|jsx|python|sql|bash|go|rust|json|yaml|html|css|java|csharp|c|cpp|dockerfile|other",
   "title": "2-5 word window title shown on the card"
 }
 TXT,

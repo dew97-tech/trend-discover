@@ -8,6 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // SQLite (test runs, phpunit :memory:) has no FULLTEXT support.
+        $supportsFullText = Schema::getConnection()->getDriverName() === 'mysql';
+
         Schema::create('sources', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
@@ -22,7 +25,7 @@ return new class extends Migration
             $table->index(['is_enabled', 'type']);
         });
 
-        Schema::create('source_items', function (Blueprint $table) {
+        Schema::create('source_items', function (Blueprint $table) use ($supportsFullText) {
             $table->id();
             $table->foreignId('source_id')->constrained()->cascadeOnDelete();
             $table->string('external_id', 255);
@@ -41,7 +44,10 @@ return new class extends Migration
             $table->index('content_hash');
             $table->index('published_at');
             $table->index(['normalized_at', 'published_at']);
-            $table->fullText('title');
+
+            if ($supportsFullText) {
+                $table->fullText('title');
+            }
         });
     }
 

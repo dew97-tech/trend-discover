@@ -32,6 +32,7 @@ class PostGenerationService
 
         $requestHash = hash('sha256', implode('|', [
             'post',
+            'v2', // v2: body no longer contains the hook (separate fields)
             $trend->id,
             $trend->item_count,
             $spec->fingerprint(),

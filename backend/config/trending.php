@@ -69,4 +69,16 @@ return [
     // dimension honest (55 base -> max 100).
     'hack_bonus_per_hit' => 9,
     'hack_bonus_max_hits' => 3,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trend cleanup
+    |--------------------------------------------------------------------------
+    | Soft-deletes trends whose last activity is older than `days`. Posts are
+    | untouched (trend soft delete), and any trend can be restored via
+    | POST /api/trends/{id}/restore. Runs at the end of the daily pipeline.
+    */
+    'cleanup' => [
+        'days' => (int) env('TREND_CLEANUP_DAYS', 2),
+    ],
 ];

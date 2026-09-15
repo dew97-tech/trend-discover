@@ -17,22 +17,22 @@ export const CONTENT_FORMATS: ContentFormatMeta[] = [
   },
   {
     value: 'laravel_hack',
-    label: 'Laravel Hack',
+    label: 'Laravel Tip',
     description: 'A specific Laravel/Artisan/Eloquent technique with the exact code.',
   },
   {
     value: 'sql_hack',
-    label: 'SQL Hack',
+    label: 'SQL Tip',
     description: 'A database technique — indexing, EXPLAIN, N+1 — with before/after queries.',
   },
   {
     value: 'react_hack',
-    label: 'React Hack',
+    label: 'React Tip',
     description: 'A specific React technique (hooks, rendering, state) with a minimal example.',
   },
   {
     value: 'nextjs_hack',
-    label: 'Next.js Hack',
+    label: 'Next.js Tip',
     description: 'A Next.js technique — App Router, caching, ISR — and the gotcha it fixes.',
   },
   {

@@ -83,7 +83,7 @@ export function FormatPickerDialog({
 
     generatePost(trendId, spec)
       .then(() => {
-        toast.success('Generation queued — it will appear in Studio shortly.')
+        toast.success('Generation queued — it will appear in Post Studio shortly.')
         onOpenChange(false)
         onQueued?.()
       })
@@ -97,19 +97,18 @@ export function FormatPickerDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Sparkles className="size-4 text-primary" />
-            Generate a variant
+            Create a post
           </DialogTitle>
           <DialogDescription>
-            One post per format + tone + angle. Research runs automatically from this trend's
-            signals.
+            One post per style + voice + angle. The AI researches the trend automatically.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label>Format</Label>
-              <HelpTip text="The content shape the post takes. Hack formats are the practical, tutorial-style core of this tool." />
+              <Label>Style</Label>
+              <HelpTip text="The shape the post takes. Tip formats are the practical, tutorial-style core of this tool." />
             </div>
             <Select value={format} onValueChange={setFormat}>
               <SelectTrigger className="w-full">
@@ -129,16 +128,16 @@ export function FormatPickerDialog({
             <p className="text-xs text-muted-foreground">{contentFormatDescription(format)}</p>
             {duplicate ? (
               <p className="text-xs text-warning">
-                A {contentFormatLabel(format)} variant already exists for this trend — generating
-                again creates another one you can compare and delete.
+                A {contentFormatLabel(format)} post already exists for this trend — creating
+                again adds another one you can compare and delete.
               </p>
             ) : null}
           </div>
 
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label>Tone</Label>
-              <HelpTip text="Voice of the post. Keep one tone per variant so comparisons stay honest." />
+              <Label>Voice</Label>
+              <HelpTip text="How the post sounds. Keep one voice per post so comparisons stay honest." />
             </div>
             <Select value={tone} onValueChange={setTone}>
               <SelectTrigger className="w-full">
@@ -162,7 +161,7 @@ export function FormatPickerDialog({
               <Label htmlFor="generate-angle">
                 Angle <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
-              <HelpTip text="Steers the draft — e.g. “focus on the migration path” or “compare with PostgreSQL”. Part of the variant identity." />
+              <HelpTip text="Steers the draft — e.g. “focus on the migration path” or “compare with PostgreSQL”." />
             </div>
             <Textarea
               id="generate-angle"
@@ -175,7 +174,7 @@ export function FormatPickerDialog({
 
           <Button onClick={handleGenerate} disabled={submitting} className="w-full">
             {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-            Generate variant
+            Create post
           </Button>
         </div>
       </DialogContent>

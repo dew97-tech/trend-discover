@@ -29,8 +29,8 @@ interface JobRun {
 
 /** Worker classes read as product verbs, not PHP class names. */
 const JOB_LABELS: Record<string, string> = {
-  CollectSourceItemsJob: 'Collect source',
-  DetectTrendsJob: 'Detect trends',
+  CollectSourceItemsJob: 'Fetch source',
+  DetectTrendsJob: 'Find trends',
   CalculateTrendScoreJob: 'Score trend',
   GeneratePostJob: 'Generate post',
   SuggestSnippetJob: 'Suggest snippet',
@@ -81,10 +81,10 @@ export function JobsPage() {
 
     runDetection()
       .then(() => {
-        toast.success('Detection queued — new runs will appear below.')
+        toast.success('Trend search queued — new runs will appear below.')
         setTimeout(load, 1500)
       })
-      .catch(() => toast.error('Could not queue detection.'))
+      .catch(() => toast.error('Could not queue the trend search.'))
       .finally(() => setDetecting(false))
   }
 
@@ -110,8 +110,8 @@ export function JobsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-6">
       <PageHeader
-        title="Jobs"
-        description="Collection, detection, scoring and generation runs — with durations, failures and logs."
+        title="Automation"
+        description="Every background run — fetching, finding trends, scoring and generating — with durations, failures and logs."
         actions={
           <>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -126,14 +126,14 @@ export function JobsPage() {
               size="sm"
               onClick={handleRunDetection}
               disabled={detecting}
-              title="Clusters ungrouped source items into trends and scores them"
+              title="Groups new mentions into trends and scores them"
             >
               {detecting ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
                 <Play className="size-3.5" />
               )}
-              Run detection
+              Find new trends
             </Button>
           </>
         }
@@ -156,8 +156,8 @@ export function JobsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Activity}
-          title={`No ${tab === 'all' ? '' : `${tab} `}job runs`}
-          description="Runs appear here as collections, detection and scoring execute."
+          title={`No ${tab === 'all' ? '' : `${tab} `}runs`}
+          description="Runs appear here as fetching, trend finding, scoring and generation execute."
         />
       ) : (
         <Card>
@@ -165,11 +165,11 @@ export function JobsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Job</th>
+                  <th className="px-4 py-2.5 font-medium">Run</th>
                   <th className="px-4 py-2.5 font-medium">Status</th>
                   <th className="px-4 py-2.5 font-medium">Duration</th>
                   <th className="px-4 py-2.5 font-medium">Started</th>
-                  <th className="px-4 py-2.5 font-medium">Detail</th>
+                  <th className="px-4 py-2.5 font-medium">Result</th>
                 </tr>
               </thead>
               <tbody>
@@ -259,7 +259,7 @@ function JobRow({ run, status, expanded, logLines, onToggle }: JobRowProps) {
         <tr className="border-b bg-surface-muted/40 last:border-0">
           <td colSpan={5} className="px-6 py-3">
             <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
-              Pipeline log — run #{run.id}
+              Run log — #{run.id}
             </p>
             {logLines === null ? (
               <p className="text-xs italic text-muted-foreground">Reading log…</p>

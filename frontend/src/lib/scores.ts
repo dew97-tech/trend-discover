@@ -13,12 +13,23 @@ export const SCORE_TIER_CLASS: Record<ScoreTier, string> = {
 }
 
 export const SCORE_HELP: Record<string, string> = {
-  trend: 'Composite ranking score (freshness, momentum, usefulness, novelty, focus, saturation).',
-  freshness: 'How recently the story surfaced — decays over ~1.5 days per halving.',
-  momentum: 'Engagement speed (points/comments per hour since first seen).',
-  relevance: 'Match strength against the technology & category registry.',
-  usefulness: 'Practical engineering value — hack/tip phrasing gets a boost.',
+  trend: 'Overall ranking score (freshness, buzz, practical value, originality, focus, overexposure).',
+  freshness: 'How recently the story surfaced — fades over ~1.5 days per halving.',
+  momentum: 'Buzz: engagement per hour since the story was first seen.',
+  relevance: 'How well the story matches your technology and category list.',
+  usefulness: 'Practical engineering value — tip/how-to phrasing gets a boost.',
   focus: 'Alignment with your focus topics (Laravel, PHP/TS, React, Next.js, databases).',
-  novelty: 'How fresh and under-covered the story is — high means not everywhere yet.',
-  saturation: 'How much the topic is already being discussed across sources.',
+  novelty: 'Originality: how fresh and under-covered the story is — high means it is not everywhere yet.',
+  saturation: 'Overexposure: how much this topic is already being discussed across sources.',
+}
+
+/** User-facing names for score dimensions (keys match the API). */
+export const SCORE_LABELS: Record<string, string> = {
+  freshness: 'Freshness',
+  momentum: 'Buzz',
+  relevance: 'Topic match',
+  usefulness: 'Practical value',
+  focus: 'Focus match',
+  novelty: 'Originality',
+  saturation: 'Overexposure',
 }

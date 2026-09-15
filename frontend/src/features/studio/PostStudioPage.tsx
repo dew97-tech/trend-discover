@@ -146,8 +146,8 @@ export function PostStudioPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-6">
       <PageHeader
-        title="Studio"
-        description="Every generated post, grouped under the trend it came from. Create variants per format, tone and angle — delete the ones you don't need."
+        title="Post Studio"
+        description="Every generated post, grouped under the trend it came from. Create one post per style, voice and angle — delete the ones you don't need."
         actions={
           <Button
             variant="outline"
@@ -165,7 +165,7 @@ export function PostStudioPage() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="published">Published</TabsTrigger>
+            <TabsTrigger value="published">Posted</TabsTrigger>
             <TabsTrigger value="archived">Archived</TabsTrigger>
             <TabsTrigger value="all">All</TabsTrigger>
           </TabsList>
@@ -194,7 +194,7 @@ export function PostStudioPage() {
           title="No posts here yet"
           description={
             tab === 'active'
-              ? 'Open a trend in the Trends view and generate your first post — variants will be grouped here.'
+              ? 'Open a trend in the Trends view and create your first post — posts are grouped here.'
               : 'Nothing matches this filter.'
           }
           action={
@@ -253,11 +253,11 @@ export function PostStudioPage() {
       <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
-        title={pendingDelete?.type === 'group' ? 'Delete all variants?' : 'Delete this post?'}
+        title={pendingDelete?.type === 'group' ? 'Delete all posts?' : 'Delete this post?'}
         description={
           pendingDelete?.type === 'group' ? (
             <>
-              Every generated variant for <strong>{pendingDelete.title}</strong> will be
+              Every generated post for <strong>{pendingDelete.title}</strong> will be
               permanently removed, including versions and attached images. This cannot be undone.
             </>
           ) : (
@@ -267,7 +267,7 @@ export function PostStudioPage() {
             </>
           )
         }
-        confirmLabel={pendingDelete?.type === 'group' ? 'Delete variants' : 'Delete post'}
+        confirmLabel={pendingDelete?.type === 'group' ? 'Delete posts' : 'Delete post'}
         onConfirm={() => void confirmDelete()}
         loading={deleting}
       />
@@ -300,18 +300,18 @@ function TrendGroupCard({
               <p className="min-w-0 text-sm font-medium leading-snug">{group.trend.title}</p>
               {group.trend.hack_style ? (
                 <Badge variant="outline" className="text-[10px] text-primary">
-                  hack
+                  practical tip
                 </Badge>
               ) : null}
               {group.trend.deleted ? (
                 <Badge variant="secondary" className="text-[10px]">
-                  trend deleted
+                  trend removed
                 </Badge>
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
-              {group.trend.category?.name ?? 'Uncategorized'} ·{' '}
-              {group.post_count === 1 ? '1 variant' : `${group.post_count} variants`}
+              {group.trend.category?.name ?? 'General'} ·{' '}
+              {group.post_count === 1 ? '1 post' : `${group.post_count} posts`}
               {group.latest_at
                 ? ` · latest ${new Date(group.latest_at).toLocaleDateString()}`
                 : ''}
@@ -321,7 +321,7 @@ function TrendGroupCard({
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="outline" onClick={onNewVariant}>
               <Plus className="size-3.5" />
-              New variant
+              Generate another post
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -331,7 +331,7 @@ function TrendGroupCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem variant="destructive" onClick={onDeleteGroup}>
-                  Delete all variants
+                  Delete all posts
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -369,7 +369,7 @@ function TrendGroupCard({
                   post.quality_score >= 80 && 'text-success',
                   post.quality_score < 60 && 'text-danger',
                 )}
-                title="Quality gate score"
+                title="Quality score"
               >
                 {Math.round(post.quality_score)}
               </span>

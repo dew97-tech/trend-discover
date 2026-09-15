@@ -45,27 +45,27 @@ const WEIGHT_FIELDS: WeightField[] = [
   },
   {
     key: 'momentum',
-    label: 'Momentum',
-    help: 'Engagement velocity: points and comments per hour since first seen.',
+    label: 'Buzz',
+    help: 'How fast engagement is accumulating (points and comments per hour).',
   },
   {
     key: 'technical_relevance',
-    label: 'Technical relevance',
+    label: 'Topic match',
     help: 'How strongly the trend matches technologies in your registry.',
   },
   {
     key: 'practical_usefulness',
-    label: 'Practical usefulness',
-    help: 'Actionable, tip/hack-style content gets a boost here.',
+    label: 'Practical value',
+    help: 'Actionable, tip-style content gets a boost here.',
   },
   {
     key: 'novelty',
-    label: 'Novelty',
-    help: 'Rewards under-covered topics — the core anti-saturation goal.',
+    label: 'Originality',
+    help: 'Rewards under-covered topics — the core anti-overexposure goal.',
   },
   {
     key: 'topic_focus',
-    label: 'Topic focus',
+    label: 'Focus topics',
     help: 'Soft boost for Laravel, PHP/TypeScript, React, Next.js and database topics. Never hides other trends.',
   },
   {
@@ -88,8 +88,8 @@ const WEIGHT_FIELDS: WeightField[] = [
 const LIMIT_FIELDS: Array<{ key: string; label: string; help: string }> = [
   {
     key: 'max_generations_per_trend',
-    label: 'Max variants per trend',
-    help: 'How many format/tone/angle variants can be generated for one trend before the limit blocks new runs.',
+    label: 'Max posts per trend',
+    help: 'How many style/voice/angle posts can be generated for one trend before the limit blocks new runs.',
   },
   {
     key: 'max_image_prompts_per_post',
@@ -174,7 +174,7 @@ export function SettingsPage() {
   function handleSaveLimits() {
     setSavingLimits(true)
     api('/settings', { method: 'PATCH', body: { limits } })
-      .then(() => toast.success('Generation limits saved.'))
+      .then(() => toast.success('AI usage limits saved.'))
       .catch(() => toast.error('Save failed.'))
       .finally(() => setSavingLimits(false))
   }
@@ -268,7 +268,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-sm font-medium">
               Trend scoring
-              <HelpTip text="Dimension weights for the composite trend score. The score is normalized by the sum of weights, so relative values matter more than exact totals." />
+              <HelpTip text="Weights for the overall trend score. The score is normalized by the sum of weights, so relative values matter more than exact totals." />
             </p>
             <Badge variant={Math.abs(weightSum - 1) <= 0.05 ? 'secondary' : 'destructive'}>
               sum {weightSum.toFixed(2)} / 1.00
@@ -299,7 +299,7 @@ export function SettingsPage() {
 
           <div className="flex items-center gap-3 border-t pt-3">
             <span className="flex w-44 shrink-0 items-center gap-1 text-xs">
-              Saturation penalty
+              Overexposure penalty
               <HelpTip text="How hard topics that are already everywhere get pushed down. Higher = more room for niche stories." />
             </span>
             <input
@@ -404,15 +404,15 @@ export function SettingsPage() {
       <Card>
         <CardHeader className="pb-2">
           <p className="flex items-center gap-1.5 text-sm font-medium">
-            Model resilience
-            <HelpTip text="OpenCode rotates its model roster without notice. Discovery ranks the gateway's current models cheap/fast-first, probes the top candidates and keeps the fastest working ones as automatic fallbacks. OpenCode's public free tier is API-blocked, so discovery uses the Go subscription roster (cost 0)." />
+            AI backup models
+            <HelpTip text="If the active model fails, requests fall back to working models discovered from the gateway. The daily refresh probes candidates and keeps the 3 fastest working ones." />
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-1.5 text-xs">
-              Auto-discover cheap/fast fallbacks
-              <HelpTip text="Runs daily (03:20) and whenever the entire fallback chain fails. Keeps the 3 fastest working models — no manual allowlist maintenance." />
+              Auto-discover backup models
+              <HelpTip text="Runs daily and whenever the whole fallback chain fails. Keeps the 3 fastest working models — no manual setup." />
             </span>
             <Switch checked={autoDiscover} onCheckedChange={handleAutoDiscoverToggle} />
           </div>
@@ -476,7 +476,7 @@ export function SettingsPage() {
       <Card>
         <CardHeader className="pb-2">
           <p className="flex items-center gap-1.5 text-sm font-medium">
-            Generation limits
+            AI usage limits
             <HelpTip text="Cost and safety controls for AI generation across the workspace." />
           </p>
         </CardHeader>
@@ -507,8 +507,8 @@ export function SettingsPage() {
       <Card>
         <CardHeader className="pb-2">
           <p className="flex items-center gap-1.5 text-sm font-medium">
-            Trend sources
-            <HelpTip text="Collectors feed the pipeline. Disable a source to stop collecting from it without deleting existing items." />
+            Data sources
+            <HelpTip text="Sources are fetched automatically every day. Disable one to stop using it without deleting existing items." />
           </p>
         </CardHeader>
         <CardContent className="space-y-1">
@@ -525,7 +525,7 @@ export function SettingsPage() {
                 <div>
                   <p className="text-sm">{source.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {source.items_count} items collected
+                    {source.items_count} items fetched
                   </p>
                 </div>
                 <Switch checked={source.is_enabled} onCheckedChange={() => toggleSource(source)} />

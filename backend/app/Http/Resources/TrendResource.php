@@ -14,6 +14,8 @@ class TrendResource extends JsonResource
             'title' => $this->title,
             'summary' => $this->when($request->routeIs('trends.show'), $this->summary),
             'status' => $this->status->value,
+            'workflow_status' => $this->workflow_status->value,
+            'workflow_status_label' => $this->workflow_status->label(),
             'category' => $this->whenLoaded('category', fn () => $this->category?->only(['id', 'name', 'slug'])),
             'technologies' => $this->whenLoaded(
                 'technologies',

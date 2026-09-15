@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Eloquent;
 
+use App\Enums\TrendWorkflowStatus;
 use App\Models\Trend;
 use App\Repositories\Contracts\TrendRepositoryInterface;
 use Illuminate\Contracts\Pagination\CursorPaginator;
@@ -18,6 +19,10 @@ class TrendRepository implements TrendRepositoryInterface
             ->when(
                 $filters['status'] ?? null,
                 fn ($q, $status) => $q->where('status', $status),
+            )
+            ->when(
+                $filters['workflow_status'] ?? null,
+                fn ($q, $workflowStatus) => $q->where('workflow_status', $workflowStatus),
             )
             ->when(
                 $filters['category_id'] ?? null,
@@ -72,7 +77,7 @@ class TrendRepository implements TrendRepositoryInterface
             ->with('category:id,name,slug')
             ->limit($limit)
             ->get([
-                'id', 'title', 'summary', 'category_id', 'status',
+                'id', 'title', 'summary', 'category_id', 'status', 'workflow_status',
                 'trend_score', 'novelty_score', 'freshness_score',
                 'saturation_score', 'item_count', 'first_seen_at',
             ]);
@@ -109,7 +114,41 @@ class TrendRepository implements TrendRepositoryInterface
             ->limit($limit)
             ->get([
                 'id', 'title', 'category_id', 'trend_score',
-                'novelty_score', 'saturation_score', 'item_count',
+                'novelty_score', 'saturation_score', 'item_count', 'workflow_status',
+            ]);
+    }
+
+    /**
+     * Trends best suited for the nightly LinkedIn post: practical,
+     * optimization-flavoured content over raw popularity.
+     *
+     * Ranking = focus + usefulness + trend_score (usefulness-weighted so
+     * fresh tips/architecture write-ups beat viral release chatter), with
+     * hack-style phrasing preferred via JSON metrics.
+     *
+     * @param  list<int>  $excludeTrendIds
+     */
+    public function dailyCandidates(int $limit = 10, array $excludeTrendIds = []): Collection
+    {
+        return Trend::query()
+            ->active()
+            ->where('workflow_status', '!=', TrendWorkflowStatus::Posted->value)
+            ->where('usefulness_score', '>=', 55)
+            ->where('saturation_score', '<=', 70)
+            ->when(
+                $excludeTrendIds !== [],
+                fn ($q) => $q->whereNotIn('id', $excludeTrendIds),
+            )
+            ->with('category:id,name,slug')
+            ->with('technologies:id,name,slug')
+            ->orderByRaw('(focus_score * 0.35 + usefulness_score * 0.45 + trend_score * 0.20) DESC')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get([
+                'id', 'title', 'summary', 'category_id', 'status', 'workflow_status',
+                'trend_score', 'novelty_score', 'usefulness_score',
+                'focus_score', 'saturation_score', 'item_count',
+                'metrics', 'first_seen_at',
             ]);
     }
 
