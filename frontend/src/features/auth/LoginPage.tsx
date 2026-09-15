@@ -57,7 +57,7 @@ export function LoginPage() {
         </div>
 
         <div className="space-y-4">
-          <p className="max-w-md font-serif text-4xl leading-[1.08] font-medium tracking-tight">
+          <p className="max-w-md font-serif text-4xl leading-[1.35] font-medium tracking-tight">
             Software engineering trends, scored before they saturate.
           </p>
           <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
@@ -70,7 +70,7 @@ export function LoginPage() {
           {SIGNALS.map((signal) => (
             <li
               key={signal}
-              className="font-mono text-[11px] tracking-[0.06em] text-muted-foreground uppercase"
+              className="font-mono text-xs text-muted-foreground"
             >
               {signal}
             </li>
